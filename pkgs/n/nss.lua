@@ -46,9 +46,6 @@ function config()
 end
 
 function uninstall()
-    for _, name in ipairs(sysroot.entries(pkginfo.install_dir() .. "/lib")) do
-        if name:find("%.so$") or name:find("%.so%.") then xvm.remove(name) end
-    end
     xvm.remove(package.name)
     return true
 end
