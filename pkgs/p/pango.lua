@@ -37,12 +37,15 @@ package = {
             --     requirement of the .pc upstream shipped, so the closure
             --     check will report it as declared-but-unused, correctly.
             deps = {
+                "xim:glibc",
                 "xim:glib@>=2.80", "xim:harfbuzz@>=8.3", "xim:fribidi@>=1.0.13",
                 "xim:cairo@>=1.18", "xim:freetype@>=2.13", "xim:fontconfig@>=2.15",
                 "xim:libthai@>=0.1.30", "xim:libXft@>=2.3.9",
             },
+            exports = { runtime = { libdirs = {"lib"} } },
             ["latest"] = { ref = "1.52.1" },
             ["1.52.1"] = {
+                revision = 1,
                 url = {
                     GLOBAL = "https://github.com/xlings-res/pango/releases/download/1.52.1/pango-1.52.1-linux-x86_64.tar.gz",
                     CN     = "https://gitcode.com/xlings-res/pango/releases/download/1.52.1/pango-1.52.1-linux-x86_64.tar.gz",

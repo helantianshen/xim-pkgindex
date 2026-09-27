@@ -43,7 +43,7 @@ assert(package.xpm.windows == nil)
 for platform, entries in pairs(package.xpm) do
     assert(entries[entries.latest.ref])
     for version, resources in pairs(entries) do
-        if version ~= "deps" and version ~= "latest" then
+        if version ~= "deps" and version ~= "latest" and version ~= "exports" then
             assert(resources.aarch64)
             assert((platform == "linux") == (resources.x86_64 ~= nil))
             for arch, asset in pairs(resources) do
@@ -66,7 +66,7 @@ def test_isolation():
     assert_no_direct_path_modification(filename)
     assert_uses_new_api(filename)
     text = RECIPE.read_text()
-    assert all(module.startswith("xim.libxpkg.") for module in re.findall(r'import\("([^"]+)"\)', text))
+    assert all((module.startswith("xim.libxpkg.") or module == "xim.pkgindex.graphics") for module in re.findall(r'import\("([^"]+)"\)', text))
     assert not re.search(r"\b(?:sudo|apt install|dnf install|pacman -S|--no-sandbox)\b", text)
 
 
@@ -154,7 +154,9 @@ def test_direct_xvm_registration(tmp_path, macos):
     code = r'''
 import = function() end
 os.isfile = function(p) local f=io.open(p); if f then f:close(); return true end; return false end
-pkginfo = { install_dir = function() return arg[2] end }
+pkginfo = { install_dir = function() return arg[2] end,
+    dep_install_dir = function() return "/fixture/gtk3" end }
+graphics = { consumer_envs = function() return {} end }
 xvm = { add = function(name, node)
     assert(name == "chatgpt")
     assert(node.bindir == arg[3])
@@ -165,3 +167,33 @@ dofile(arg[1])
 assert(config())
 '''
     subprocess.run([lua, "-", str(RECIPE), str(root), str(bindir)], input=code, text=True, check=True)
+
+
+@pytest.mark.verify
+def test_installed_linux_native_modules():
+    """使用配方写入的加载器检查当前架构模块，禁止宿主库兜底"""
+    import platform
+    if platform.system() != "Linux":
+        pytest.skip("Linux runtime check")
+    home = Path(os.environ.get("XLINGS_HOME", str(Path.home() / ".xlings"))).resolve()
+    apps = list((home / "data/xpkgs").glob("*-x-chatgpt/*/app/ChatGPT"))
+    if not apps:
+        pytest.skip("Install ChatGPT before the runtime verification")
+    machine = {"x86_64": 62, "aarch64": 183}.get(platform.machine())
+    for executable in apps:
+        headers = subprocess.check_output(["readelf", "-l", str(executable)], text=True)
+        loader = re.search(r"Requesting program interpreter: (.+?)\]", headers).group(1)
+        assert loader.startswith(str(home) + "/data/xpkgs/")
+        targets = [executable, executable.parent / "libqt5_shim.so", executable.parent / "libqt6_shim.so"]
+        for native in executable.parent.rglob("*.node"):
+            if "musl" in str(native) or "android" in str(native):
+                continue
+            with native.open("rb") as stream:
+                header = stream.read(20)
+            if header[:4] == b"\x7fELF" and int.from_bytes(header[18:20], "little") == machine:
+                targets.append(native)
+        for target in targets:
+            result = subprocess.run([loader, "--list", str(target)], capture_output=True, text=True)
+            assert result.returncode == 0, f"{target}: {result.stderr}"
+            for resolved in re.findall(r"=> (/\S+)", result.stdout):
+                assert resolved.startswith(str(home) + "/"), f"Host library: {resolved}"

@@ -1,7 +1,8 @@
 # ChatGPT 桌面版
 
 该包使用 OpenAI 官方固定版本资源，由 xlings 保存独立程序目录并切换启动入口。
-支持 Linux x86_64、ARM64 和 macOS ARM64；不提供 Windows 或 macOS Intel 资源。
+收录 Linux x86_64、ARM64 和 macOS ARM64 资源；不提供 Windows 或 macOS Intel 资源。
+Linux ARM64 的基础运行库仍不完整，当前不能承诺该平台可安装运行。
 包状态为 `dev`，平台声明表示有对应资源，不代表所有桌面环境已完成验收。
 
 当前收录 `26.924.22138` 和 `26.917.71314`，`latest` 指向前者。
@@ -22,7 +23,7 @@ chatgpt
 ## 安装边界
 
 - Linux 提取官方 deb 中的完整 `usr/lib/chatgpt`，不调用 dpkg、apt、dnf 或 pacman，不执行包内安装脚本，不配置系统软件源
-- deb 是程序内容的分发容器；是否能运行取决于宿主 glibc、桌面库和安全策略，而不是宿主是否使用 dpkg
+- deb 是程序内容的分发容器；用户态运行库通过 xlings 的 deps 提供，不要求宿主安装 Debian 包管理器
 - deb 的 ar、xz、tar 三层均由声明的 xlings `7zip` 依赖解包
 - macOS 使用官方 appcast 中的完整 ZIP，保留 `.app` 结构并在安装时检查版本和代码签名；不修改签名、不清除隔离属性、不覆盖 `/Applications`
 - 通过 xvm 将 `chatgpt` 直接注册为 `ChatGPT` 二进制的别名；本包不修改全局 PATH、默认浏览器、URL 协议处理器或系统桌面入口
@@ -36,7 +37,14 @@ Alpine/musl 不在支持范围内。
 
 Linux 运行库需要通过包的 `deps` 声明，由 xlings 安装和提供。
 不提供要求用户自行补装发行版库的 `--check-deps` 命令。
-当前配方仅声明了解包依赖 `xim:7zip`，运行库闭环尚未完成，PR 保持 Draft。
+配方声明 glibc、GCC、GTK 3、NSS/NSPR、AT-SPI、CUPS、ALSA、X11、Mesa、Qt 5/6、USB 和 TPM 等独立依赖。
+新增库采用固定的 conda-forge 或 Debian 二进制资源及逐架构 SHA256，不调用系统包管理器。
+Qt 5 采用官方 Qt 5.15.2 qtbase 和配套 ICU 56，复用现有 qtsdk 下载与校验；不包含 Qt Quick 或 ODBC/PostgreSQL 驱动。
+原生模块使用的内置 libvips 仍来自 ChatGPT 自身资源，通过包内库目录参与解析。
+GTK schema 在包内编译，NSS 动态模块注册到 SubOS 库入口；Pango 补充 glibc 与运行库导出，并提高配方 revision。
+
+Linux ARM64 仍缺 glibc 加载器、GCC 及部分图形基础库资源，Qt 5 当前仅提供已验证的 x86_64 官方 SDK。
+新增的其他独立库已校验双架构归档，但这不代表整条 ARM64 依赖链可用。PR 保持 Draft/dev，等待社区补充基础资源与验收环境。
 不能把资源存在、安装成功或静态检查通过当作桌面运行验收。
 内核、显示服务、设备驱动和桌面会话仍属于宿主边界，不通过关闭 sandbox 绕过安全策略。
 
@@ -64,7 +72,9 @@ xvm 为该应用进程设置 `CODEX_SPARKLE_ENABLED=false`，关闭所收录版�
 首轮实测覆盖隔离 `XLINGS_HOME` 中的 CachyOS x86_64 两版本安装、切换和卸载。
 首轮 CI 覆盖 Linux x86_64、macOS ARM64 的 latest 安装和卸载。
 改为 xvm 直接启动后的验证以对应提交的 CI 和测试结果为准。
-GUI 启动、登录、Linux ARM64 运行和跨发行版桌面兼容性仍未完成验收。
+本轮在隔离 home 实装新增依赖，使用 xlings 加载器检查主程序、Qt shim 和当前架构的 glibc 原生模块。
+`pytest tests/c/test_chatgpt.py -m verify` 可复验已安装版本的库解析；检查禁止宿主库兜底，跳过归档内不属于当前 glibc 平台的预构建模块。
+GUI 登录、Linux ARM64 运行和跨发行版桌面兼容性仍未完成验收。
 
 ## 官方资料
 

@@ -30,7 +30,48 @@ package = {
     xvm_enable = true,
     xpm = {
         linux = {
-            deps = {"xim:7zip@26.02"},
+            exports = { runtime = { libdirs = {
+                "app",
+                "app/resources/cua_node/lib/node_modules/@img/sharp-libvips-linux-x64/lib",
+                "app/resources/cua_node/lib/node_modules/@img/sharp-libvips-linux-arm64/lib",
+            } } },
+            deps = {
+                "xim:7zip@26.02",
+                "xim:glibc",
+                "xim:gcc-runtime",
+                "xim:glib",
+                "xim:nss",
+                "xim:nspr",
+                "xim:atk",
+                "xim:at-spi2-atk",
+                "xim:at-spi2-core",
+                "xim:dbus",
+                "xim:libcups",
+                "xim:expat",
+                "xim:libxcb",
+                "xim:libxkbcommon",
+                "xim:alsa-lib",
+                "xim:mesa",
+                "xim:libX11",
+                "xim:libXext",
+                "xim:libXcomposite",
+                "xim:libXdamage",
+                "xim:libXfixes",
+                "xim:libXrandr",
+                "xim:cairo",
+                "xim:pango",
+                "xim:libudev1",
+                "xim:gdk-pixbuf",
+                "xim:gtk3",
+                "xim:openssl",
+                "xim:tss2-esys",
+                "xim:tss2-mu",
+                "xim:tss2-tcti-device",
+                "xim:libusb",
+                "xim:qt5",
+                "xim:qt-base",
+                "xim:graphics",
+            },
             ["latest"] = { ref = "26.924.22138" },
             ["26.924.22138"] = {
                 x86_64 = deb("26.924.22138", "amd64", "ce3bb1aa82ccdfe3037ada2fd8d187796ea4a0d5ed031d0e4ec8adce8b7014e7"),
@@ -53,6 +94,7 @@ import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.system")
 import("xim.libxpkg.xvm")
 import("xim.libxpkg.json")
+import("xim.pkgindex.graphics")
 
 local function quote(s)
     return "'" .. s:gsub("'", "'\\''") .. "'"
@@ -98,14 +140,19 @@ end
 function config()
     local dir = pkginfo.install_dir()
     local bindir = dir .. "/app"
+    local envs = { CODEX_SPARKLE_ENABLED = "false" }
     if os.isfile(dir .. "/ChatGPT.app/Contents/MacOS/ChatGPT") then
         bindir = dir .. "/ChatGPT.app/Contents/MacOS"
+    else
+        envs = graphics.consumer_envs()
+        envs.CODEX_SPARKLE_ENABLED = "false"
+        envs.GSETTINGS_SCHEMA_DIR = pkginfo.dep_install_dir("xim:gtk3") .. "/share/glib-2.0/schemas"
     end
     -- 更新开关只传给当前应用及其子进程
     xvm.add("chatgpt", {
         bindir = bindir,
         alias = "ChatGPT",
-        envs = { CODEX_SPARKLE_ENABLED = "false" },
+        envs = envs,
     })
     return true
 end
