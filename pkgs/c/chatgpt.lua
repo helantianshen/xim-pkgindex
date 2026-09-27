@@ -72,7 +72,7 @@ function install()
         os.mkdir(unpack)
         system.exec(quote(sevenzip) .. " x -tAr -y " .. quote(archive) .. " data.tar.xz -o" .. quote(unpack))
         system.exec(quote(sevenzip) .. " x -txz -y " .. quote(unpack .. "/data.tar.xz") .. " -o" .. quote(unpack))
-        system.exec(quote(sevenzip) .. " x -ttar -y " .. quote(unpack .. "/data.tar") .. " -o" .. quote(unpack))
+        system.exec(quote(sevenzip) .. " x -ttar -y " .. quote(unpack .. "/data.tar") .. " -o" .. quote(unpack) .. " './usr/lib/chatgpt/*'")
         local app = unpack .. "/usr/lib/chatgpt"
         local metadata = json.loadfile(app .. "/resources/linux-package-metadata.json")
         assert(metadata.version == version, "ChatGPT archive version mismatch")

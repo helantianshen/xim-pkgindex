@@ -90,6 +90,8 @@ def test_deb_install_roundtrip(tmp_path, version):
     (app / "resources/app.asar").write_bytes(b"fixture")
     (app / "resources/asar-link").symlink_to("app.asar")
     (app / "resources/linux-package-metadata.json").write_text(json.dumps({"version": version}))
+    (stage / "usr/bin").mkdir()
+    (stage / "usr/bin/chatgpt").symlink_to("../lib/chatgpt/codex-launcher")
     with tarfile.open(tmp_path / "data.tar.xz", "w:xz") as archive:
         archive.add(stage / "usr", arcname="./usr")
     (tmp_path / "debian-binary").write_text("2.0\n")
