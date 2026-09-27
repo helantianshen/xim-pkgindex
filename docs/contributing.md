@@ -74,6 +74,12 @@ workflow 边界见 [CI 镜像与自动更新设计](../.agents/docs/2026-07-12-x
 5. 更新配方的 `source`/`sha256`，运行版本检查器；缺失平台、架构、sidecar 或 hash 时
    让检查器 fail closed。
 6. 只在全部资源验证完成后提交一个 PR。补发旧版本不能让 `latest` 回退。
+7. 已发布版本需要重建或重新打包（补丁、前缀、布局）时，不新增版本键，也不替换
+   已发布资产：以 `<version>-r<N>` 为 release tag 和资产名发布新资产，版本项改用新
+   `url`/`sha256`，并把 `revision` 增为 N（见 V2 规范的
+   [`revision`](V2/xpackage-spec.md#revision--a-packaging-change-under-an-unchanged-version)
+   一节）。`.github/scripts/check-revision.lua` 拒绝资源变化而 `revision` 未增加的
+   改动；改变安装结果的 hook 修改同样需要增加 `revision`，由 review 判断。
 
 `xim-index` 索引工件属于独立发布链：它使用版本化 tarball、pointer 和 SHA256，不能
 把索引工件放进软件包的 `xlings-res/<package>` 目录，也不能把二进制资源当成索引工件。

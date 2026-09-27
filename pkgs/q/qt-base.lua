@@ -270,9 +270,8 @@ function installed()
     for _, e in ipairs(list) do
         if marker[e.module] ~= e.sha256 then return false end
     end
-    -- A payload installed before its runtime closure was declared (Linux:
-    -- the loader and RUNPATH; Windows: the VC++ runtime in bin/) is installed
-    -- again, so an update reaches the machines that have it.
+    -- A payload laid out before its runtime closure was declared (Linux: the
+    -- loader and RUNPATH; Windows: the VC++ runtime in bin/) is not this one.
     if not qtsdk.runtime_current(marker) then return false end
 
     local d = pkginfo.install_dir()

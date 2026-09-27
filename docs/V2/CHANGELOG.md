@@ -11,6 +11,17 @@ introduced with **XPackage Spec V2 (multi-arch)**. Requires **xlings ≥ 0.4.61*
   per-arch sha256 (C), and `res = true` + per-arch sha256. Arch names are
   normalized (`arm64↔aarch64`, `amd64↔x86_64`). `package.archs` is now
   validated fail-closed. See [`xpackage-spec.md`](./xpackage-spec.md).
+- **`revision` on a version entry** (2026-09-26). A non-negative integer,
+  default 0, that increases whenever what the recipe installs for a published
+  version changes — a new asset, or a hook change that alters the installed
+  files — so a packaging fix no longer needs a new version key
+  (openxlings/xlings#620). A client records the revision it installed and
+  reinstalls, stating why, when the recipe's differs; one that predates the
+  field ignores it. A published url and sha256 stay immutable: a new revision
+  names a new asset. Read by libxpkg ≥ 0.0.58; enforced for changed entries by
+  `.github/scripts/check-revision.lua`. First use: `glibc` 2.44.3 revision 1
+  (openxlings/xlings#621). See
+  [`xpackage-spec.md`](./xpackage-spec.md#revision--a-packaging-change-under-an-unchanged-version).
 
 ## Tooling fixes
 

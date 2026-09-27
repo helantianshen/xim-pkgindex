@@ -18,55 +18,55 @@
 #   * it is the one package whose payload cannot be patched by elfpatch: it IS
 #     the loader. Its own layout has to be right at build time.
 #
-# Usage:  build-glibc.sh <upstream> [<package-version>]
+# Usage:  build-glibc.sh <upstream> [<package-version> [<revision>]]
 #           build-glibc.sh 2.44              -> glibc-2.44-linux-x86_64.tar.gz
-#           build-glibc.sh 2.44 2.44.1       -> glibc-2.44.1-linux-x86_64.tar.gz
+#           build-glibc.sh 2.44 2.44.3       -> glibc-2.44.3-linux-x86_64.tar.gz
+#           build-glibc.sh 2.44 2.44.3 1     -> glibc-2.44.3-r1-linux-x86_64.tar.gz
 #
-# TWO ARGUMENTS, AND WHY THE PACKAGE VERSION HAS TO SORT ABOVE THE ONE IT
-# REPLACES
+# THE PACKAGE VERSION AND THE REVISION
 #
-# When a payload is rebuilt for a reason that is ours rather than upstream's --
-# a patch, a prefix, a packaging fix -- the bytes change while the glibc
-# version does not. Publishing those bytes as "2.44" again gives one name to
-# two artifacts, and it breaks the party that did nothing wrong: a client
-# holding a cached index still has the OLD sha256, downloads the NEW asset,
-# and fails the integrity check. It also leaves everyone already on 2.44 with
-# nothing that distinguishes the fixed copy. So the package gets its own
-# version, and the upstream one it was built from is a separate argument.
+# <package-version> is the index key, and it differs from <upstream> for
+# history only: 2.44.1 to 2.44.3 are upstream 2.44, each rebuilt for a reason
+# of ours (a prefix, a patch). They were given new versions because a
+# published url and sha256 are immutable -- a client holding a cached index
+# still has the old hash, so new bytes behind the old url fail its integrity
+# check -- and because nothing else told a machine already on the old payload
+# that it was stale. The new version had to sort ABOVE the one it replaced:
+# a range such as `xim:glibc@>=2.38` resolves through `semver::select_best`,
+# the maximum satisfying version, which is why `2.44r1` (a pre-release of 2.44
+# to xlings' semver) was abandoned for `2.44.1`.
 #
-# WHICH version is not a matter of taste. Recipes depend on this package as
-# `xim:glibc@>=2.38` (libllvm, glslang, elfutils, graphite2, ...), and
-# `select_version_` answers a range with `semver::select_best`, which returns
-# the MAXIMUM satisfying version -- not the one `latest` points at. So a
-# revision that sorts BELOW the artifact it supersedes is not merely untidy;
-# every ranged dependency resolves straight back to the copy being replaced.
-#
-# The first attempt here was `2.44r1`, and it has exactly that defect.
-# xlings' semver splits a field at digit/alpha boundaries and reads a missing
-# segment as numeric 0, so an alpha segment loses to it: their own pinned
-# corpus asserts `compare("6.5", "6.5rc1") > 0`. `2.44r1` is therefore a
-# PRE-release of 2.44 as far as every range expression is concerned.
-#
-# `2.44.1` sorts above `2.44` by the same rule read the other way (1 > the
-# missing 0). It is also the same string in the index key, the git tag, the
-# asset name and both urls -- unlike `+1`, where jdk-temurin's `["25.0.4+7"]`
-# needs `%2B` in the GLOBAL url and a rename to `25.0.4_7` on the CN mirror --
-# and unlike `-1`, which publish.sh's `${stem##*-}` would truncate.
-#
-# It does collide with a hypothetical upstream glibc 2.44.1. Upstream has not
-# shipped a three-component release in this series; if it ever does, take the
-# next free revision rather than reusing this shape.
+# That scheme spent a version key per packaging fix and made the binding --
+# the payload directory name -- change with it (openxlings/xlings#620). A
+# rebuild for a reason of ours now keeps the version key and raises
+# `revision` on the version entry (docs/V2/xpackage-spec.md). The url and the
+# sha256 stay immutable, so the rebuilt asset needs a name of its own:
+# <revision> adds `-r<N>` to the asset and to its release tag, and the recipe
+# entry keeps its key, takes the new url and sha256, and states the new
+# revision. A client that implements revision reinstalls a payload whose
+# recorded revision differs; an older one installs the new asset on its next
+# fresh install only.
 set -uo pipefail
 
-UPSTREAM="${1:?usage: build-glibc.sh <upstream> [<package-version>]}"
-VERSION="${2:-$UPSTREAM}"   # what the artifact is called and published as
+UPSTREAM="${1:?usage: build-glibc.sh <upstream> [<package-version> [<revision>]]}"
+VERSION="${2:-$UPSTREAM}"   # the index key the artifact is published under
+REVISION="${3:-0}"          # the entry's `revision`; names the asset when > 0
+[[ "$REVISION" =~ ^(0|[1-9][0-9]*)$ ]] || {
+    echo "[gfx-build:glibc] revision must be a non-negative integer: $REVISION" >&2
+    exit 2
+}
+if (( REVISION > 0 )); then
+    ASSET_VERSION="$VERSION-r$REVISION"   # also the release tag
+else
+    ASSET_VERSION="$VERSION"
+fi
 NAME=glibc
 SUBOS_NAME="${XLINGS_GFX_SUBOS:-gfxbuild}"
 XHOME="${XLINGS_HOME:-$HOME/.xlings}"
 SUBOS="$XHOME/subos/$SUBOS_NAME"
 WORK="${XLINGS_GFX_WORK:-${TMPDIR:-/tmp}/xlings-gfx}"
 SRC="$WORK/src"
-STAGE="$WORK/stage/$NAME-$VERSION"
+STAGE="$WORK/stage/$NAME-$ASSET_VERSION"
 DIST="$WORK/dist"
 
 log()  { echo "[gfx-build:$NAME] $*"; }
@@ -104,7 +104,42 @@ rm -rf "$STAGE"; mkdir -p "$SRC" "$STAGE" "$DIST"
 #     silently picking up the host's loader and mispairing GLIBC_PRIVATE
 #   * ld.so.cache never hits; we do not use ldconfig
 #   * `--prefix` and DESTDIR are separate, so the install layout is unaffected
-PREFIX="/nonexistent/xlings-use-rpath-not-default-search"
+#
+# PADDED TO 255 BYTES, SO THAT THE INSTALL CAN RELOCATE IT (openxlings/xlings#621)
+#
+# The prefix is also where libc finds its own data: lib/locale (and its
+# locale-archive), lib/gconv, share/locale, share/zoneinfo, etc/localtime,
+# libexec/getconf. Left dead, none of it is reachable. Measured on 2.44.3
+# under LANG=C.UTF-8: setlocale(LC_ALL, "") and setlocale(LC_ALL, "C.UTF-8")
+# return NULL, and iconv_open("GBK", "UTF-8") fails although the payload
+# ships 255 gconv modules.
+#
+# These paths are C strings inside ELF files, so the recipe rewrites them at
+# install time without changing any length: each occurrence of the
+# placeholder becomes the install directory followed by `/` up to the
+# placeholder's length, and `<install>////lib/locale` names the same
+# directory as `<install>/lib/locale`. The file, every string in it, and
+# every length compiled in beside a string (sizeof, a strlen the compiler
+# folded, ld.so's table of directory lengths) stay valid, so glibc's sources
+# need no change for it. That requires the placeholder to be at least as long
+# as the install path, and the 48-byte reserved prefix is shorter than an
+# ordinary one (`/home/alice/.xlings/data/xpkgs/xim-x-glibc/2.44.3` is 49
+# bytes, mcpp's registry path 56 or more).
+#
+# So the reserved prefix stays the leading part -- an unrelocated payload
+# still resolves nothing on the host, which is the property above -- and one
+# padding component brings the whole to 255 bytes, conda's length. Each
+# component stays within NAME_MAX, and 255 bytes is the longest install
+# directory the recipe accepts; it refuses a longer one by name.
+RESERVED_PREFIX="/nonexistent/xlings-use-rpath-not-default-search"
+PREFIX="$RESERVED_PREFIX/padding-to-255-bytes-for-install-time-relocation"
+while (( ${#PREFIX} < 255 )); do PREFIX+="_"; done
+# The recipe (pkgs/g/glibc.lua) spells the same string; both have to agree
+# byte for byte. The recipe refuses a payload padded any other way.
+(( ${#PREFIX} == 255 )) || fail "padded prefix is ${#PREFIX} bytes, not 255"
+for component in ${PREFIX//\// }; do
+    (( ${#component} <= 255 )) || fail "prefix component longer than NAME_MAX: $component"
+done
 
 TARBALL="$SRC/glibc-$UPSTREAM.tar.xz"
 [[ -f "$TARBALL" ]] || {
@@ -177,7 +212,14 @@ log "staging"
 make install DESTDIR="$STAGE" >> "$WORK/$NAME-build.log" 2>&1 \
     || { tail -30 "$WORK/$NAME-build.log"; fail "make install"; }
 
-PAYLOAD="$WORK/payload/$NAME-$VERSION"
+# The archive's top-level directory is the archive's own stem. The recipe
+# derives the payload root as `install_file()` minus `.tar.gz`, and falls back
+# to searching the shared extraction directory only when that is absent; the
+# assets up to 2.44.3 revision 0 hold `glibc-<version>/` and always take the
+# fallback, which picks the first directory holding a libc -- with a stale
+# `glibc-2.44.3/` beside `glibc-2.44.3-r1-.../`, the wrong one.
+STEM="$NAME-$ASSET_VERSION-linux-x86_64"
+PAYLOAD="$WORK/payload/$STEM"
 rm -rf "$PAYLOAD"; mkdir -p "$PAYLOAD"
 cp -a "$STAGE$PREFIX/." "$PAYLOAD/" || fail "payload copy"
 
@@ -186,6 +228,16 @@ cp -a "$STAGE$PREFIX/." "$PAYLOAD/" || fail "payload copy"
 if [[ ! -d "$PAYLOAD/lib64" ]]; then
     ln -s lib "$PAYLOAD/lib64" || fail "lib64 link"
 fi
+
+# The UTF-8 charmap uncompressed, beside the UTF-8.gz `make install` writes.
+# The recipe compiles C.utf8 at install time with this payload's localedef
+# (pkgs/g/glibc.lua, __generate_c_utf8), and localedef reads a `.gz` charmap
+# by spawning `gzip -d -c` from PATH -- a host tool that xlings itself does not
+# need, since it extracts archives in-process. localedef opens the plain name
+# first, so shipping it removes the dependency for the one charmap used.
+CHARMAPS="$PAYLOAD/share/i18n/charmaps"
+gzip -dc "$CHARMAPS/UTF-8.gz" > "$CHARMAPS/UTF-8" || fail "UTF-8 charmap"
+chmod 644 "$CHARMAPS/UTF-8"
 
 # ── drop the RPATH the subos compiler injected ──────────────────────────
 #
@@ -421,10 +473,76 @@ if [[ -n "$LOADER" ]]; then
     fi
 fi
 
+# Every compiled-in path carries the WHOLE padded prefix.
+#
+# The recipe relocates the padded string and then refuses a payload in which
+# the reserved prefix survives, so a path that reached the payload in its
+# 48-byte form -- a directory configured apart from --prefix, a string built
+# from a truncated copy -- would fail the install on a user's machine. Found
+# here instead, per file: every occurrence of the reserved prefix has to be
+# the start of the padded one. A string that holds the prefix several times
+# (a colon-separated search list) counts each.
+while IFS= read -r -d '' f; do
+    n_reserved="$(grep -oaF "$RESERVED_PREFIX" "$f" | wc -l)"
+    n_padded="$(grep -oaF "$PREFIX" "$f" | wc -l)"
+    if (( n_reserved != n_padded )); then
+        echo "    ${f#"$PAYLOAD"/}: $((n_reserved - n_padded)) occurrence(s) of the reserved prefix without the padding"
+        leaks=$((leaks+1))
+    fi
+done < <(grep -rlaFZ "$RESERVED_PREFIX" "$PAYLOAD")
+
+# The locale and conversion data the recipe makes reachable, checked here
+# without the relocation: C.utf8 compiled by the payload's own localedef from
+# its own sources and loaded by its own libc (LOCPATH stands in for the
+# relocated lib/locale), and one conversion through its own gconv modules
+# (GCONV_PATH stands in for lib/gconv). A failure here is a defect of the
+# payload, not of the relocation, and it is cheaper to find before publishing.
+# localedef exits 1 when it wrote the locale with warnings, so the verdict is
+# the file it produced, not its status. It runs with an empty PATH, so a pass
+# also shows that it needed no host tool (the uncompressed charmap above).
+if [[ -n "$LOADER" ]]; then
+    LPROBE="$WORK/locale-probe"; rm -rf "$LPROBE"; mkdir -p "$LPROBE"
+    env PATH=/nonexistent I18NPATH="$PAYLOAD/share/i18n" \
+        "$LOADER" --library-path "$PAYLOAD/lib" \
+        "$PAYLOAD/bin/localedef" --no-archive -i C -f UTF-8 "$LPROBE/C.utf8" \
+        > "$LPROBE/localedef.log" 2>&1
+    if [[ -f "$LPROBE/C.utf8/LC_CTYPE" ]]; then
+        charmap="$(LOCPATH="$LPROBE" LC_ALL=C.UTF-8 "$LOADER" --library-path "$PAYLOAD/lib" \
+                   "$PAYLOAD/bin/locale" charmap 2>&1)"
+        if [[ "$charmap" == "UTF-8" ]]; then
+            log "  C.utf8: compiled by the payload's localedef, loaded by its libc"
+        else
+            echo "    C.utf8 was compiled but does not load under this libc: $charmap"
+            leaks=$((leaks+1))
+        fi
+    else
+        echo "    the payload's localedef did not produce C.utf8:"
+        tail -5 "$LPROBE/localedef.log" | sed 's/^/      /'
+        leaks=$((leaks+1))
+    fi
+    # U+4E2D is D6 D0 in GBK.
+    gbk="$(printf '\xe4\xb8\xad' | GCONV_PATH="$PAYLOAD/lib/gconv" \
+           "$LOADER" --library-path "$PAYLOAD/lib" "$PAYLOAD/bin/iconv" -f UTF-8 -t GBK \
+           2>/dev/null | od -An -tx1 | tr -d ' \n')"
+    if [[ "$gbk" == "d6d0" ]]; then
+        log "  gconv: UTF-8 -> GBK through the payload's own modules"
+    else
+        echo "    UTF-8 -> GBK through the payload's gconv modules gave '$gbk', expected d6d0"
+        leaks=$((leaks+1))
+    fi
+fi
+
 (( leaks == 0 )) || fail "$leaks problem(s) — payload not packaged"
 
-TAR="$DIST/$NAME-$VERSION-linux-x86_64.tar.gz"
+# Reproducible packaging, the form build-in-subos.sh uses and states the
+# reason for: member order, owner and mtime fixed, and no gzip timestamp.
+TAR="$DIST/$STEM.tar.gz"
 rm -f "$TAR"
-tar czf "$TAR" -C "$(dirname "$PAYLOAD")" "$(basename "$PAYLOAD")" || fail "tar"
+tar --sort=name \
+    --owner=0 --group=0 --numeric-owner \
+    --mtime="@${SOURCE_DATE_EPOCH:-0}" \
+    --format=gnu \
+    -cf - -C "$(dirname "$PAYLOAD")" "$STEM" \
+  | gzip -n -9 > "$TAR" || fail "tar"
 log "packaged $(basename "$TAR") ($(du -h "$TAR" | cut -f1))"
 log "sha256 $(sha256sum "$TAR" | cut -d' ' -f1)"

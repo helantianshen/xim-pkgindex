@@ -41,8 +41,17 @@ BADGLOBAL=0
 for f in "${FILES[@]}"; do
     base="$(basename "$f")"                       # name-version-linux-x86_64.tar.gz
     stem="${base%-linux-x86_64.tar.gz}"
-    name="${stem%-*}"
-    version="${stem##*-}"
+    # A rebuild under an unchanged version key is `name-version-r<N>`
+    # (build-glibc.sh; `revision` in docs/V2/xpackage-spec.md), and its
+    # release tag is `version-r<N>`. Splitting at the last `-` alone would
+    # publish it as package `name-version`, tag `r<N>`.
+    if [[ "$stem" =~ ^(.+)-([^-]+-r[0-9]+)$ ]]; then
+        name="${BASH_REMATCH[1]}"
+        version="${BASH_REMATCH[2]}"
+    else
+        name="${stem%-*}"
+        version="${stem##*-}"
+    fi
     [[ -n "$name" && -n "$version" ]] || { warn "cannot parse $base"; continue; }
 
     if [[ $# -gt 0 ]] && ! printf '%s\n' "$@" | grep -qx "$stem"; then continue; fi

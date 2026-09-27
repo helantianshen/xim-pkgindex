@@ -115,6 +115,21 @@ jobs:
           chmod +x .github/scripts/check-dep-namespace.sh
           .github/scripts/check-dep-namespace.sh
 
+      # A published version entry changes what it installs only together with
+      # a higher `revision` (docs/V2/xpackage-spec.md). A client records the
+      # revision it installed and reinstalls when the recipe's differs, so an
+      # entry whose url or sha256 changed under an unchanged revision carries
+      # bytes that no machine already holding the version ever receives, and
+      # that a client with a cached index fails to verify. The check compares
+      # every entry the base already has, in every recipe the change touches,
+      # loading both sides as Lua with the lua5.4 installed above. A hook
+      # change that alters the installed files needs a higher revision too;
+      # that is judged in review, not here.
+      - name: Lint version-entry revisions
+        run: |
+          chmod +x .github/scripts/check-revision.sh
+          .github/scripts/check-revision.sh
+
       - name: version-check unit tests (url_template + XLINGS_RES bump)
         run: python3 .github/scripts/test_version_check.py
 

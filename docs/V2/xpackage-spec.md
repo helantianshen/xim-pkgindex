@@ -315,6 +315,86 @@ recipes.
 The index keeps the **raw, arch-agnostic** data; arch is resolved per-host at
 install time (so a single shared index artifact serves every arch).
 
+## `revision` — a packaging change under an unchanged version
+
+A version entry may state `revision`: how many times what the recipe installs
+for that version has changed while the upstream version has not.
+
+| field | type | default | on |
+|---|---|---|---|
+| `revision` | integer ≥ 0 | `0` | the version entry table, in every shape: single `url`, mirror table, per-arch map (beside the arch keys), URL template, `res` |
+
+```lua
+["2.44.3"] = {
+    url = {
+        GLOBAL = "https://github.com/xlings-res/glibc/releases/download/2.44.3-r1/glibc-2.44.3-r1-linux-x86_64.tar.gz",
+        CN     = "https://gitcode.com/xlings-res/glibc/releases/download/2.44.3-r1/glibc-2.44.3-r1-linux-x86_64.tar.gz",
+    },
+    sha256 = "...",
+    revision = 1,
+},
+["1.2.0"] = {
+    x86_64  = { url = "...", sha256 = "..." },
+    aarch64 = { url = "...", sha256 = "..." },
+    revision = 1,
+},
+```
+
+An entry that states none has revision 0. A string entry (`"XLINGS_RES"`, a
+bare url) has revision 0 and becomes a table to state one. A `ref` alias
+carries none: `["latest"] = { ref = "2.44.3" }` resolves to the entry it names,
+and that entry's revision applies. A value that is not a non-negative integer
+reads as 0 in the reference implementation (libxpkg ≥ 0.0.58), and the index CI
+rejects it.
+
+### When it increases
+
+Whenever what the recipe installs for a published version changes:
+
+- **a new asset** — the payload is rebuilt or repackaged for a reason of ours
+  (a prefix, a patch, a layout fix) while the upstream version stays; or
+- **a hook change that alters the installed files** — install() now writes,
+  moves or rewrites something it did not before.
+
+It never decreases, and a published version key is never renamed to carry the
+change instead. Packaging versions with a fourth segment (`fontconfig`
+2.15.0.1, `libglvnd` 1.7.0.1, `qt-base` 6.11.1.1) are no longer created: the
+payload directory name is the binding consumers hold, so a new key moved every
+binding with it, and a range dependency resolved to whichever key sorted
+highest (openxlings/xlings#620).
+
+A published url and its sha256 are immutable. A client holding a cached index
+still has the old hash, and new bytes behind the old url fail its integrity
+check. So a new asset gets a new url — for xlings-res, a release tag and asset
+name with `-r<N>` appended to the version — and the old asset stays published
+as it is. An entry that inherits its url from `source` states an explicit `url`
+for the new asset, since the template would name the old one.
+
+### The client contract
+
+- **Record** the revision that was installed, with the payload. A record that
+  predates the field reads as revision 0.
+- **Compare** it with the recipe entry's revision. A payload whose recorded
+  revision differs is not installed.
+- **Reinstall** it, and state the reason (`revision 0 -> 1`). A failed
+  reinstall leaves the previous payload in place.
+
+### Compatibility
+
+A new field on an existing shape is safe (see
+[Adopting a capability older clients do not have](#adopting-a-capability-older-clients-do-not-have)):
+a client that predates `revision` ignores the key. It installs the entry's
+current url and sha256 on a fresh install, and keeps a payload it already
+holds. Because the url and the sha256 change together with the revision, no
+client ever pairs new bytes with an old hash.
+
+`.github/scripts/check-revision.lua` enforces the rule for every version entry
+a pull request changes: a changed resource (url, mirror urls, sha256, per-arch
+map, `res`) without a higher revision fails, as does a revision that decreases,
+is not a non-negative integer, sits inside a per-arch map or on an alias. A
+hook change is not visible to it; whether one alters the installed files is
+decided in review.
+
 ## Install hooks must be arch-aware too
 
 If a recipe unpacks an arch-named directory, derive it from `os.arch()` in the
