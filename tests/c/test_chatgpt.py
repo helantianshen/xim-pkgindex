@@ -75,108 +75,6 @@ def test_index_registration():
     assert_xim_add_succeeds(str(RECIPE))
 
 
-@pytest.fixture
-def launcher(tmp_path):
-    root = tmp_path / "version's directory with spaces"
-    (root / "bin").mkdir(parents=True)
-    (root / "app/resources").mkdir(parents=True)
-    (root / "package-version").write_text("26.924.22138\n")
-    (root / "app/resources/linux-package-metadata.json").write_text(
-        json.dumps({"version": "26.924.22138"}))
-    program = root / "app/ChatGPT"
-    program.write_text('#!/bin/sh\nprintf "%s\\n" "$CODEX_SPARKLE_ENABLED" "$@"\n')
-    program.chmod(0o755)
-    script = re.search(r"local launcher = \[=\[(.*?)\]=\]", RECIPE.read_text(), re.S).group(1)
-    command = root / "bin/chatgpt"
-    command.write_text(script)
-    command.chmod(0o755)
-    return command, root
-
-
-@pytest.mark.static
-def test_version_does_not_start_app(launcher):
-    command, root = launcher
-    (root / "app/ChatGPT").unlink()
-    result = subprocess.run([command, "--version"], capture_output=True, text=True)
-    assert result.returncode == 0
-    assert result.stdout == "ChatGPT 26.924.22138\n"
-
-
-@pytest.mark.static
-def test_launch_preserves_arguments_and_disables_updater(launcher):
-    command, _ = launcher
-    result = subprocess.run([command, "space in argument", "", "codex://example"],
-                            env={**os.environ, "CODEX_SPARKLE_ENABLED": "true"},
-                            capture_output=True, text=True)
-    assert result.returncode == 0
-    assert result.stdout == "false\nspace in argument\n\ncodex://example\n"
-
-
-@pytest.mark.static
-def test_changed_payload_is_rejected(launcher):
-    command, root = launcher
-    (root / "app/resources/linux-package-metadata.json").write_text('{"version":"different"}')
-    result = subprocess.run([command], capture_output=True, text=True)
-    assert result.returncode != 0
-    assert "version mismatch" in result.stderr
-    assert not result.stdout
-
-
-@pytest.mark.static
-def test_missing_library_fails_diagnostic(launcher, tmp_path):
-    command, root = launcher
-    (root / "app/native.node").write_bytes(b"\x7fELFtest")
-    tools = tmp_path / "tools"
-    tools.mkdir()
-    for name, script in {
-        "getconf": "echo 'glibc 2.39'",
-        "ldd": "echo 'libexample.so => not found'",
-    }.items():
-        p = tools / name
-        p.write_text("#!/bin/sh\n" + script + "\n")
-        p.chmod(0o755)
-    command.write_text(command.read_text().replace("/usr/bin/getconf", str(tools / "getconf")).replace("/usr/bin/ldd", str(tools / "ldd")))
-    result = subprocess.run([command, "--check-deps"], capture_output=True, text=True,
-                            env={**os.environ, "PATH": str(tools) + os.pathsep + os.environ["PATH"]})
-    assert result.returncode != 0
-    assert "native.node" in result.stderr
-    assert "libexample.so => not found" in result.stderr
-
-
-@pytest.mark.static
-def test_dependency_check_ignores_path_shims(launcher, tmp_path):
-    if not Path("/usr/bin/ldd").exists() or not Path("/usr/bin/getconf").exists():
-        pytest.skip("Host glibc tools are required")
-    command, root = launcher
-    shutil.copy2("/usr/bin/true", root / "app/native")
-    tools = tmp_path / "shims"
-    tools.mkdir()
-    for name in ("ldd", "getconf"):
-        shim = tools / name
-        shim.write_text("#!/bin/sh\necho 'incorrect shim' >&2\nexit 1\n")
-        shim.chmod(0o755)
-    result = subprocess.run([command, "--check-deps"], capture_output=True, text=True,
-                            env={**os.environ, "PATH": str(tools) + os.pathsep + os.environ["PATH"]})
-    assert result.returncode == 0, result.stderr
-    assert "incorrect shim" not in result.stderr
-    assert "ELF library check passed" in result.stdout
-
-
-@pytest.mark.static
-def test_musl_is_rejected(launcher, tmp_path):
-    command, _ = launcher
-    tools = tmp_path / "tools"
-    tools.mkdir()
-    getconf = tools / "getconf"
-    getconf.write_text("#!/bin/sh\nexit 1\n")
-    getconf.chmod(0o755)
-    command.write_text(command.read_text().replace("/usr/bin/getconf", str(tools / "getconf")).replace("/usr/bin/ldd", str(tools / "ldd")))
-    result = subprocess.run([command, "--check-deps"], capture_output=True, text=True,
-                            env={**os.environ, "PATH": str(tools) + os.pathsep + os.environ["PATH"]})
-    assert result.returncode != 0
-    assert "musl is unsupported" in result.stderr
-
-
 @pytest.mark.static
 @pytest.mark.parametrize("version", ["26.924.22138", "wrong-version"])
 def test_deb_install_roundtrip(tmp_path, version):
@@ -190,6 +88,7 @@ def test_deb_install_roundtrip(tmp_path, version):
     (app / "ChatGPT").write_text("#!/bin/sh\nexit 0\n")
     (app / "ChatGPT").chmod(0o755)
     (app / "resources/app.asar").write_bytes(b"fixture")
+    (app / "resources/asar-link").symlink_to("app.asar")
     (app / "resources/linux-package-metadata.json").write_text(json.dumps({"version": version}))
     with tarfile.open(tmp_path / "data.tar.xz", "w:xz") as archive:
         archive.add(stage / "usr", arcname="./usr")
@@ -230,10 +129,37 @@ assert(install())
     if version == "wrong-version":
         assert result.returncode != 0
         assert "archive version mismatch" in result.stderr
-        assert not (target / "bin/chatgpt").exists()
+        assert not (target / "app/ChatGPT").exists()
     else:
         assert result.returncode == 0, result.stderr
         assert not (target / ".unpack").exists()
         assert (target / "app/resources/app.asar").read_bytes() == b"fixture"
-        output = subprocess.check_output([target / "bin/chatgpt", "--version"], text=True)
-        assert output == "ChatGPT 26.924.22138\n"
+        assert os.access(target / "app/ChatGPT", os.X_OK)
+        assert (target / "app/resources/asar-link").is_symlink()
+        assert (target / "app/resources/asar-link").read_bytes() == b"fixture"
+
+
+@pytest.mark.static
+@pytest.mark.parametrize("macos", [False, True])
+def test_direct_xvm_registration(tmp_path, macos):
+    lua = shutil.which("lua") or shutil.which("lua5.4")
+    if not lua:
+        pytest.skip("Lua is required")
+    root = tmp_path / "version's directory with spaces"
+    bindir = root / ("ChatGPT.app/Contents/MacOS" if macos else "app")
+    bindir.mkdir(parents=True)
+    (bindir / "ChatGPT").touch()
+    code = r'''
+import = function() end
+os.isfile = function(p) local f=io.open(p); if f then f:close(); return true end; return false end
+pkginfo = { install_dir = function() return arg[2] end }
+xvm = { add = function(name, node)
+    assert(name == "chatgpt")
+    assert(node.bindir == arg[3])
+    assert(node.alias == "ChatGPT")
+    assert(node.envs.CODEX_SPARKLE_ENABLED == "false")
+end }
+dofile(arg[1])
+assert(config())
+'''
+    subprocess.run([lua, "-", str(RECIPE), str(root), str(bindir)], input=code, text=True, check=True)
