@@ -40,7 +40,8 @@ local archives = {
         sha256 = "df4740feb9e9639ae5c95289988663d65f69a46fa9ccfb50742e9d73f0a04ac9",
     },
     {
-        -- Qt 5 的 ICU 56 归档与 qtbase 共用嵌套目录，不能按 Qt 6 的平铺 ICU 处理
+        -- Qt 5's ICU 56 archive nests under the same tree as qtbase, unlike
+        -- Qt 6's flat ICU archive, so it is extracted with qtbase's layout
         module = "qt5-icu",
         name = "icu-linux-Rhel7.2-x64.7z",
         path = prefix .. "icu-linux-Rhel7.2-x64.7z",
@@ -74,7 +75,8 @@ function install()
     os.mv(stage .. "/5.15.2/gcc_64", dir)
     os.mv(stage .. "/.qt5-archives.txt", dir .. "/.qt5-archives.txt")
     os.tryrm(stage)
-    -- qtbase 的数据库插件依赖未收录的 ODBC/PostgreSQL 客户端，不属于桌面运行库
+    -- These SQL driver plugins link ODBC/PostgreSQL client libraries this
+    -- index does not carry; they are not part of a desktop runtime
     qtsdk.prune(dir, {"plugins/sqldrivers/libqsqlodbc.so", "plugins/sqldrivers/libqsqlpsql.so"})
     qtsdk.ensure_qt_conf(dir)
     return installed()

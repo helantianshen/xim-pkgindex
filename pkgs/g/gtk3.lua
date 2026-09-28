@@ -80,7 +80,8 @@ function install()
     selfcontain.seal(dir)
     sysroot.relocate_pkgconfig(dir, "lib/pkgconfig")
     local schemas = dir .. "/share/glib-2.0/schemas"
-    system.exec(pkginfo.dep_install_dir("xim:glib") .. "/bin/glib-compile-schemas --strict " .. schemas)
+    local compiler = pkginfo.dep_install_dir("xim:glib") .. "/bin/glib-compile-schemas"
+    system.exec(string.format("%q --strict %q", compiler, schemas))
     return os.isfile(dir .. "/lib/libgtk-3.so.0") and os.isfile(schemas .. "/gschemas.compiled")
 end
 
@@ -91,6 +92,9 @@ function config()
     sysroot.declare_libs(dir, "lib", binding, pkginfo.version())
     sysroot.declare_headers_tree(dir, "include", "usr/include", binding)
     sysroot.declare_pkgconfig(dir, "lib/pkgconfig", binding)
+    -- declare_headers is the per-child file-asset declarer (declare_pkgconfig
+    -- uses it the same way); here it places the compiled schemas where
+    -- XDG_DATA_DIRS=<subos>/share leads GLib
     sysroot.declare_headers(dir, "share/glib-2.0/schemas", "share/glib-2.0/schemas", binding)
     return true
 end
