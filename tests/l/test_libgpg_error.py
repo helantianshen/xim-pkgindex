@@ -1,11 +1,11 @@
-"""tss2-esys 运行库配方验证"""
+"""libgpg-error: repacked runtime library recipe"""
 from tests.lib.desktop_runtime_checks import check_recipe, check_index
 import pytest
 
 @pytest.mark.static
 def test_recipe():
-    check_recipe("tss2-esys")
+    check_recipe("libgpg-error")
 
 @pytest.mark.index
 def test_index():
-    check_index("tss2-esys")
+    check_index("libgpg-error")

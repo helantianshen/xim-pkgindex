@@ -1,43 +1,77 @@
--- conda-forge 固定构建的独立运行库，资源 SHA256 与两架构 ELF 依赖均已核对
 package = {
     spec = "2",
+
+    homepage = "https://sites.google.com/site/fullycapable/",
     name = "libcap",
-    description = "libcap runtime libraries for desktop applications",
-    homepage = "https://anaconda.org/conda-forge/libcap",
+    description = "The POSIX capabilities libraries (libcap, libpsx), with headers and pkg-config data",
+
     licenses = {"BSD-3-Clause"},
+    repo = "https://git.kernel.org/pub/scm/libs/libcap/libcap.git",
+
     type = "package",
     archs = {"x86_64", "aarch64"},
     status = "dev",
-    categories = {"library", "desktop"},
+    categories = {"system", "lib"},
+    keywords = {"libcap", "capabilities", "lib"},
+
     xvm_enable = true,
+
     xpm = {
         linux = {
-            deps = {"xim:7zip", "xim:glibc"},
-            exports = { runtime = { libdirs = {"lib"} } },
+            -- DT_NEEDED outside the payload (readelf -d): libc only.
+            deps = { "xim:glibc" },
+            exports = {
+                runtime = { libdirs = { "lib" } },
+            },
             ["latest"] = { ref = "2.71" },
             ["2.71"] = {
                 x86_64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-64/libcap-2.71-h39aace5_0.conda",
-                    sha256 = "2bbefac94f4ab8ff7c64dc843238b6c8edcc9ff1f2b5a0a48407a904dc7ccfb2",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/libcap/releases/download/2.71/libcap-2.71-linux-x86_64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/libcap/releases/download/2.71/libcap-2.71-linux-x86_64.tar.gz",
+                    },
+                    sha256 = "0f13a2fa973f82c7e99d06231ff77c2ff07ad2d7b6c51d999ce42f18c396a619",
                 },
                 aarch64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-aarch64/libcap-2.71-h51d75a7_0.conda",
-                    sha256 = "2b66e66e6a0768e833e7edc764649679881ec0a6b37d9bf254b1ceb3b8b434ef",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/libcap/releases/download/2.71/libcap-2.71-linux-aarch64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/libcap/releases/download/2.71/libcap-2.71-linux-aarch64.tar.gz",
+                    },
+                    sha256 = "16b4198432a304f3f90f806fc630c0f49622b35efe0d350bc64812c443fe83dd",
                 },
             },
         },
     },
 }
 
+-- Repacked from conda-forge by .agents/tools/repack/repack.py, x86_64 from
+--     libcap-2.71-h39aace5_0.conda
+-- and aarch64 from the same release's arm64 build. PROVENANCE.md inside the
+-- payload records every artefact, its sha256 and the exact command.
+--
+-- PLACEHOLDERS: only the .pc files carried one; rewritten to prefix=/usr.
+
+import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.xvm")
-import("xim.pkgindex.runtime_archive")
+import("xim.pkgindex.sysroot")
+import("xim.pkgindex.selfcontain")
 
 function install()
-    return runtime_archive.install({"lib/libcap.so.2", "lib/libpsx.so.2"})
+    local dir = pkginfo.install_dir()
+    os.tryrm(dir)
+    os.mv(package.name .. "-" .. pkginfo.version(), dir)
+    selfcontain.seal(dir)
+    sysroot.relocate_pkgconfig(dir, "lib/pkgconfig")
+    return os.isfile(dir .. "/lib/libcap.so.2")
 end
 
 function config()
+    local dir = pkginfo.install_dir()
+    local binding = package.name .. "@" .. pkginfo.version()
     xvm.add(package.name, { type = "group" })
+    sysroot.declare_libs(dir, "lib", binding, pkginfo.version())
+    sysroot.declare_headers_tree(dir, "include", "usr/include", binding)
+    sysroot.declare_pkgconfig(dir, "lib/pkgconfig", binding)
     return true
 end
 

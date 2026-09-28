@@ -1,43 +1,76 @@
--- conda-forge 固定构建的独立运行库，资源 SHA256 与两架构 ELF 依赖均已核对
 package = {
     spec = "2",
+
+    homepage = "https://gitlab.gnome.org/GNOME/atk",
     name = "atk",
-    description = "atk runtime libraries for desktop applications",
-    homepage = "https://anaconda.org/conda-forge/atk-1.0",
+    description = "The ATK accessibility toolkit library (libatk-1.0), with headers and pkg-config data",
+
     licenses = {"LGPL-2.0-or-later"},
+
     type = "package",
     archs = {"x86_64", "aarch64"},
     status = "dev",
-    categories = {"library", "desktop"},
+    categories = {"gui", "lib"},
+    keywords = {"atk", "accessibility", "gnome", "lib"},
+
     xvm_enable = true,
+
     xpm = {
         linux = {
-            deps = {"xim:7zip", "xim:glib", "xim:glibc"},
-            exports = { runtime = { libdirs = {"lib"} } },
+            -- DT_NEEDED outside the payload (readelf -d): libglib-2.0, libgobject-2.0.
+            deps = { "xim:glibc", "xim:glib" },
+            exports = {
+                runtime = { libdirs = { "lib" } },
+            },
             ["latest"] = { ref = "2.38.0" },
             ["2.38.0"] = {
                 x86_64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-64/atk-1.0-2.38.0-h04ea711_2.conda",
-                    sha256 = "df682395d05050cd1222740a42a551281210726a67447e5258968dd55854302e",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/atk/releases/download/2.38.0/atk-2.38.0-linux-x86_64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/atk/releases/download/2.38.0/atk-2.38.0-linux-x86_64.tar.gz",
+                    },
+                    sha256 = "7710bb6a701af67e3809e5ae9cd630c346b41b537c66cc60bc85cd6bb9a89076",
                 },
                 aarch64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-aarch64/atk-1.0-2.38.0-hedc4a1f_2.conda",
-                    sha256 = "69f70048a1a915be7b8ad5d2cbb7bf020baa989b5506e45a676ef4ef5106c4f0",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/atk/releases/download/2.38.0/atk-2.38.0-linux-aarch64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/atk/releases/download/2.38.0/atk-2.38.0-linux-aarch64.tar.gz",
+                    },
+                    sha256 = "0b9363895126c71c1dbe3b4c2655ed30064eb588d4e0ea33cf0e701b8a5d3fce",
                 },
             },
         },
     },
 }
 
+-- Repacked from conda-forge by .agents/tools/repack/repack.py, x86_64 from
+--     atk-1.0-2.38.0-h04ea711_2.conda
+-- and aarch64 from the same release's arm64 build. PROVENANCE.md inside the
+-- payload records every artefact, its sha256 and the exact command.
+--
+-- PLACEHOLDERS: only the .pc files carried one; rewritten to prefix=/usr.
+
+import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.xvm")
-import("xim.pkgindex.runtime_archive")
+import("xim.pkgindex.sysroot")
+import("xim.pkgindex.selfcontain")
 
 function install()
-    return runtime_archive.install({"lib/libatk-1.0.so.0"})
+    local dir = pkginfo.install_dir()
+    os.tryrm(dir)
+    os.mv(package.name .. "-" .. pkginfo.version(), dir)
+    selfcontain.seal(dir)
+    sysroot.relocate_pkgconfig(dir, "lib/pkgconfig")
+    return os.isfile(dir .. "/lib/libatk-1.0.so.0")
 end
 
 function config()
+    local dir = pkginfo.install_dir()
+    local binding = package.name .. "@" .. pkginfo.version()
     xvm.add(package.name, { type = "group" })
+    sysroot.declare_libs(dir, "lib", binding, pkginfo.version())
+    sysroot.declare_headers_tree(dir, "include", "usr/include", binding)
+    sysroot.declare_pkgconfig(dir, "lib/pkgconfig", binding)
     return true
 end
 

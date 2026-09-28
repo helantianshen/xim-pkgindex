@@ -1,18 +1,18 @@
 package = {
     spec = "2",
 
-    homepage = "https://firefox-source-docs.mozilla.org/nspr/",
-    name = "nspr",
-    description = "Netscape Portable Runtime (libnspr4, libplc4, libplds4), with headers and pkg-config data",
+    homepage = "https://gnupg.org/software/libgpg-error/",
+    name = "libgpg-error",
+    description = "The GnuPG error-code library (libgpg-error), with headers and pkg-config data",
 
-    licenses = {"MPL-2.0"},
-    repo = "https://hg.mozilla.org/projects/nspr",
+    licenses = {"LGPL-2.1-or-later"},
+    repo = "https://dev.gnupg.org/source/libgpg-error.git",
 
     type = "package",
     archs = {"x86_64", "aarch64"},
     status = "dev",
-    categories = {"system", "lib"},
-    keywords = {"nspr", "mozilla", "lib"},
+    categories = {"security", "lib"},
+    keywords = {"gnupg", "gpg-error", "lib"},
 
     xvm_enable = true,
 
@@ -23,21 +23,21 @@ package = {
             exports = {
                 runtime = { libdirs = { "lib" } },
             },
-            ["latest"] = { ref = "4.40" },
-            ["4.40"] = {
+            ["latest"] = { ref = "1.61" },
+            ["1.61"] = {
                 x86_64 = {
                     url = {
-                        GLOBAL = "https://github.com/xlings-res/nspr/releases/download/4.40/nspr-4.40-linux-x86_64.tar.gz",
-                        CN     = "https://gitcode.com/xlings-res/nspr/releases/download/4.40/nspr-4.40-linux-x86_64.tar.gz",
+                        GLOBAL = "https://github.com/xlings-res/libgpg-error/releases/download/1.61/libgpg-error-1.61-linux-x86_64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/libgpg-error/releases/download/1.61/libgpg-error-1.61-linux-x86_64.tar.gz",
                     },
-                    sha256 = "e5793e6d31f9ecd8b39c2c5dcba678125b230e735924a8e24b581a01a5a44e5a",
+                    sha256 = "e3b5a956606e9d4172825b4932cd24f6a5e1b72644c68c967093a40035f66306",
                 },
                 aarch64 = {
                     url = {
-                        GLOBAL = "https://github.com/xlings-res/nspr/releases/download/4.40/nspr-4.40-linux-aarch64.tar.gz",
-                        CN     = "https://gitcode.com/xlings-res/nspr/releases/download/4.40/nspr-4.40-linux-aarch64.tar.gz",
+                        GLOBAL = "https://github.com/xlings-res/libgpg-error/releases/download/1.61/libgpg-error-1.61-linux-aarch64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/libgpg-error/releases/download/1.61/libgpg-error-1.61-linux-aarch64.tar.gz",
                     },
-                    sha256 = "4d7bde97142649f1342d0a43efe459559ac26b14632ae85147c38887c436303d",
+                    sha256 = "0b0addbbf43094b140ce08c57b30e733e8a21a597b014469e1bd8078eb8611d5",
                 },
             },
         },
@@ -45,11 +45,13 @@ package = {
 }
 
 -- Repacked from conda-forge by .agents/tools/repack/repack.py, x86_64 from
---     nspr-4.40-h29cc59b_0.conda
+--     libgpg-error-1.61-h54a6638_2.conda
 -- and aarch64 from the same release's arm64 build. PROVENANCE.md inside the
 -- payload records every artefact, its sha256 and the exact command.
 --
--- PLACEHOLDERS: only the .pc files carried one; rewritten to prefix=/usr.
+-- PLACEHOLDERS: libgpg-error.so.0 names /etc (gpgrt.conf) and /usr/share/locale; both are the
+-- host's, so the repack maps them there (--host).
+-- .pc files, if any, -> prefix=/usr.
 
 import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.xvm")
@@ -62,7 +64,7 @@ function install()
     os.mv(package.name .. "-" .. pkginfo.version(), dir)
     selfcontain.seal(dir)
     sysroot.relocate_pkgconfig(dir, "lib/pkgconfig")
-    return os.isfile(dir .. "/lib/libnspr4.so")
+    return os.isfile(dir .. "/lib/libgpg-error.so.0")
 end
 
 function config()

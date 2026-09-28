@@ -13,6 +13,11 @@
 # wrong bytes. Both regions are downloaded and compared against the local file.
 #
 # Usage:  publish.sh <distdir> [name-version ...]      (default: everything)
+#
+# Any `<name>-<version>-linux-<arch>.tar.gz` is accepted, so the repack tool's
+# output (.agents/tools/repack/) goes through the same chain; a `.sha256`
+# sidecar next to a tarball is published with it. XLINGS_RES_NOTES overrides
+# the release notes, which otherwise describe a subos build.
 set -uo pipefail
 
 DIST="${1:?usage: publish.sh <distdir> [pkg ...]}"; shift || true
@@ -39,8 +44,8 @@ MANIFEST="$DIST/RECIPE-DATA.txt"
 BADGLOBAL=0
 
 for f in "${FILES[@]}"; do
-    base="$(basename "$f")"                       # name-version-linux-x86_64.tar.gz
-    stem="${base%-linux-x86_64.tar.gz}"
+    base="$(basename "$f")"                       # name-version-linux-<arch>.tar.gz
+    stem="${base%.tar.gz}"; stem="${stem%-linux-*}"
     # A rebuild under an unchanged version key is `name-version-r<N>`
     # (build-glibc.sh; `revision` in docs/V2/xpackage-spec.md), and its
     # release tag is `version-r<N>`. Splitting at the last `-` alone would
@@ -93,10 +98,11 @@ for f in "${FILES[@]}"; do
     # output could not support.
     if ! gh release view "$version" --repo "$ORG/$name" >/dev/null 2>&1; then
         gh release create "$version" --repo "$ORG/$name" \
-             --title "$version" --notes "Built from source against the xlings subos glibc." \
+             --title "$version" --notes "${XLINGS_RES_NOTES:-Built from source against the xlings subos glibc.}" \
           || { warn "$name: cannot create release $version"; continue; }
     fi
-    gh release upload "$version" "$f" --repo "$ORG/$name" --clobber \
+    assets=("$f"); [[ -f "$f.sha256" ]] && assets+=("$f.sha256")
+    gh release upload "$version" "${assets[@]}" --repo "$ORG/$name" --clobber \
       || { warn "$name: GitHub upload failed"; continue; }
 
     GLOBAL="https://github.com/$ORG/$name/releases/download/$version/$base"
@@ -118,6 +124,10 @@ for f in "${FILES[@]}"; do
         fi
         gtc release publish "$ORG/$name" --tag "$version" --asset "$f" >/dev/null 2>&1 \
           || warn "$name: gtc publish reported a problem"
+        if [[ -f "$f.sha256" ]]; then
+            gtc release upload "$ORG/$name" --tag "$version" "$f.sha256" >/dev/null 2>&1 \
+              || warn "$name: gtc sidecar upload reported a problem"
+        fi
     fi
 
     # Verify by downloading, from both regions, and comparing bytes. A mirror

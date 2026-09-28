@@ -1,43 +1,76 @@
--- conda-forge 固定构建的独立运行库，资源 SHA256 与两架构 ELF 依赖均已核对
 package = {
     spec = "2",
+
+    homepage = "https://gitlab.freedesktop.org/xorg/lib/libxcomposite",
     name = "libXcomposite",
-    description = "libXcomposite runtime libraries for desktop applications",
-    homepage = "https://anaconda.org/conda-forge/xorg-libxcomposite",
+    description = "The X Composite extension client library (libXcomposite), with headers and pkg-config data",
+
     licenses = {"MIT"},
+
     type = "package",
     archs = {"x86_64", "aarch64"},
     status = "dev",
-    categories = {"library", "desktop"},
+    categories = {"graphics", "x11", "lib"},
+    keywords = {"x11", "xcomposite", "lib"},
+
     xvm_enable = true,
+
     xpm = {
         linux = {
-            deps = {"xim:7zip", "xim:glibc", "xim:libX11"},
-            exports = { runtime = { libdirs = {"lib"} } },
+            -- DT_NEEDED outside the payload (readelf -d): libX11.
+            deps = { "xim:glibc", "xim:libX11" },
+            exports = {
+                runtime = { libdirs = { "lib" } },
+            },
             ["latest"] = { ref = "0.4.6" },
             ["0.4.6"] = {
                 x86_64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-64/xorg-libxcomposite-0.4.6-hb9d3cd8_2.conda",
-                    sha256 = "753f73e990c33366a91fd42cc17a3d19bb9444b9ca5ff983605fa9e953baf57f",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/libXcomposite/releases/download/0.4.6/libXcomposite-0.4.6-linux-x86_64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/libXcomposite/releases/download/0.4.6/libXcomposite-0.4.6-linux-x86_64.tar.gz",
+                    },
+                    sha256 = "5dd7911014e5a67f581ed51af0fe7360b866f0928202b39310ce7785827f3474",
                 },
                 aarch64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-aarch64/xorg-libxcomposite-0.4.6-h86ecc28_2.conda",
-                    sha256 = "0cb82160412adb6d83f03cf50e807a8e944682d556b2215992a6fbe9ced18bc0",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/libXcomposite/releases/download/0.4.6/libXcomposite-0.4.6-linux-aarch64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/libXcomposite/releases/download/0.4.6/libXcomposite-0.4.6-linux-aarch64.tar.gz",
+                    },
+                    sha256 = "858a3477b86e3e06f6c69becff8c2152c238dc01e1fdfccb815fa7d88c5f611f",
                 },
             },
         },
     },
 }
 
+-- Repacked from conda-forge by .agents/tools/repack/repack.py, x86_64 from
+--     xorg-libxcomposite-0.4.6-hb9d3cd8_2.conda
+-- and aarch64 from the same release's arm64 build. PROVENANCE.md inside the
+-- payload records every artefact, its sha256 and the exact command.
+--
+-- PLACEHOLDERS: only the .pc files carried one; rewritten to prefix=/usr.
+
+import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.xvm")
-import("xim.pkgindex.runtime_archive")
+import("xim.pkgindex.sysroot")
+import("xim.pkgindex.selfcontain")
 
 function install()
-    return runtime_archive.install({"lib/libXcomposite.so.1"})
+    local dir = pkginfo.install_dir()
+    os.tryrm(dir)
+    os.mv(package.name .. "-" .. pkginfo.version(), dir)
+    selfcontain.seal(dir)
+    sysroot.relocate_pkgconfig(dir, "lib/pkgconfig")
+    return os.isfile(dir .. "/lib/libXcomposite.so.1")
 end
 
 function config()
+    local dir = pkginfo.install_dir()
+    local binding = package.name .. "@" .. pkginfo.version()
     xvm.add(package.name, { type = "group" })
+    sysroot.declare_libs(dir, "lib", binding, pkginfo.version())
+    sysroot.declare_headers_tree(dir, "include", "usr/include", binding)
+    sysroot.declare_pkgconfig(dir, "lib/pkgconfig", binding)
     return true
 end
 

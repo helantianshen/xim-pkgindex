@@ -30,56 +30,41 @@ package = {
     xvm_enable = true,
     xpm = {
         linux = {
+            -- Linux arm64 debs exist upstream, but glibc and gcc-runtime have
+            -- no arm64 payload yet, so only x86_64 is offered here.
+            --
+            -- Put first on every ELF's RUNPATH by elfpatch: the bundled
+            -- libvips the native image module links against.
             exports = { runtime = { libdirs = {
                 "app",
                 "app/resources/cua_node/lib/node_modules/@img/sharp-libvips-linux-x64/lib",
-                "app/resources/cua_node/lib/node_modules/@img/sharp-libvips-linux-arm64/lib",
             } } },
+            -- Grouped by how the app reaches them. 7zip unpacks the deb in
+            -- install(); everything else is the app's runtime closure.
             deps = {
                 "xim:7zip@26.02",
-                "xim:glibc",
-                "xim:gcc-runtime",
-                "xim:glib",
-                "xim:nss",
-                "xim:nspr",
-                "xim:atk",
-                "xim:at-spi2-atk",
-                "xim:at-spi2-core",
-                "xim:dbus",
-                "xim:libcups",
-                "xim:expat",
-                "xim:libxcb",
-                "xim:libxkbcommon",
-                "xim:alsa-lib",
-                "xim:mesa",
-                "xim:libX11",
-                "xim:libXext",
-                "xim:libXcomposite",
-                "xim:libXdamage",
-                "xim:libXfixes",
-                "xim:libXrandr",
-                "xim:cairo",
-                "xim:pango",
-                "xim:libudev1",
-                "xim:gdk-pixbuf",
-                "xim:gtk3",
-                "xim:openssl",
-                "xim:tss2-esys",
-                "xim:tss2-mu",
-                "xim:tss2-tcti-device",
-                "xim:libusb",
-                "xim:qt5",
-                "xim:qt-base",
+                -- DT_NEEDED of ChatGPT and its native modules (readelf -d)
+                "xim:glibc", "xim:gcc-runtime", "xim:glib", "xim:dbus", "xim:expat",
+                "xim:nss", "xim:nspr", "xim:atk", "xim:at-spi2-atk", "xim:at-spi2-core",
+                "xim:libcups", "xim:cairo", "xim:pango", "xim:gdk-pixbuf", "xim:gtk3",
+                "xim:libxcb", "xim:libxkbcommon", "xim:libX11", "xim:libXext",
+                "xim:libXcomposite", "xim:libXdamage", "xim:libXfixes", "xim:libXrandr",
+                "xim:alsa-lib", "xim:mesa", "xim:libudev", "xim:libusb", "xim:openssl",
+                "xim:tpm2-tss",
+                -- dlopen'd by Chromium/Electron: the keyring-backed credential
+                -- store (without it: a plain-text store) and notifications
+                "xim:libsecret", "xim:libnotify",
+                -- Chromium's optional Qt UI shims (KDE, --ui-toolkit=qt)
+                "xim:qt5", "xim:qt-base",
+                -- GL/EGL/Vulkan discovery for the GPU process
                 "xim:graphics",
             },
             ["latest"] = { ref = "26.924.22138" },
             ["26.924.22138"] = {
                 x86_64 = deb("26.924.22138", "amd64", "ce3bb1aa82ccdfe3037ada2fd8d187796ea4a0d5ed031d0e4ec8adce8b7014e7"),
-                aarch64 = deb("26.924.22138", "arm64", "6570f078c5ea25461ce103b2e31fa7dd6c5e717136fa9237c701d22db62b5e3f"),
             },
             ["26.917.71314"] = {
                 x86_64 = deb("26.917.71314", "amd64", "851ec28b65bde2ff1da9f37dcdf5b6e20a915c7568f8b2ce993c00428f018ae5"),
-                aarch64 = deb("26.917.71314", "arm64", "2114883623dae34a4bc7a67faad3e6652dd9bfdc7a28f57c36ed03e350be1cf1"),
             },
         },
         macosx = {
@@ -94,10 +79,24 @@ import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.system")
 import("xim.libxpkg.xvm")
 import("xim.libxpkg.json")
+import("xim.libxpkg.log")
 import("xim.pkgindex.graphics")
 
 local function quote(s)
     return "'" .. s:gsub("'", "'\\''") .. "'"
+end
+
+local function apparmor_profile(dir)
+    return dir .. "/share/apparmor/xlings-chatgpt"
+end
+
+-- 1 when unprivileged user namespaces need an AppArmor grant on this host
+local function userns_restricted()
+    local f = io.open("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
+    if not f then return false end
+    local v = f:read("*l")
+    f:close()
+    return v == "1"
 end
 
 function install()
@@ -109,12 +108,14 @@ function install()
 
     if archive:match("%.deb$") then
         local unpack = dir .. "/.unpack"
-        local sevenzip = pkginfo.dep_install_dir("xim:7zip") .. "/7zz"
+        local z = quote(pkginfo.dep_install_dir("xim:7zip") .. "/7zz")
         os.tryrm(unpack)
         os.mkdir(unpack)
-        system.exec(quote(sevenzip) .. " x -tAr -y " .. quote(archive) .. " data.tar.xz -o" .. quote(unpack))
-        system.exec(quote(sevenzip) .. " x -txz -y " .. quote(unpack .. "/data.tar.xz") .. " -o" .. quote(unpack))
-        system.exec(quote(sevenzip) .. " x -ttar -y " .. quote(unpack .. "/data.tar") .. " -o" .. quote(unpack) .. " './usr/lib/chatgpt/*'")
+        -- ar -> xz -> tar as one stream: the 1.5 GiB data.tar never lands on
+        -- disk, and only the application directory is written out.
+        system.exec(z .. " e -so -tAr " .. quote(archive) .. " data.tar.xz | "
+            .. z .. " x -si -txz -so | "
+            .. z .. " x -si -ttar -y -o" .. quote(unpack) .. " './usr/lib/chatgpt/*' >/dev/null")
         local app = unpack .. "/usr/lib/chatgpt"
         local metadata = json.loadfile(app .. "/resources/linux-package-metadata.json")
         assert(metadata.version == version, "ChatGPT archive version mismatch")
@@ -123,6 +124,16 @@ function install()
         os.tryrm(dir .. "/app")
         os.mv(app, dir .. "/app")
         os.tryrm(unpack)
+        -- The deb's postinst loads an AppArmor profile that grants user
+        -- namespaces to /usr/lib/chatgpt/ChatGPT, which Chromium's sandbox
+        -- needs on hosts that restrict them (Ubuntu 23.10+). The same profile
+        -- for this path, for the user to load; config() says how.
+        os.mkdir(dir .. "/share/apparmor")
+        local f = assert(io.open(apparmor_profile(dir), "w"))
+        f:write("abi <abi/4.0>,\ninclude <tunables/global>\n\n",
+                "profile xlings-chatgpt-", version, " \"", dir, "/app/ChatGPT\" flags=(unconfined) {\n",
+                "  userns,\n}\n")
+        f:close()
     elseif archive:match("%.zip$") then
         local app = parent .. "/ChatGPT.app"
         system.exec("test \"$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' " ..
@@ -144,11 +155,20 @@ function config()
     if os.isfile(dir .. "/ChatGPT.app/Contents/MacOS/ChatGPT") then
         bindir = dir .. "/ChatGPT.app/Contents/MacOS"
     else
+        -- XDG_DATA_DIRS among these reaches <subos>/share, where gtk3
+        -- places its compiled GSettings schemas
         envs = graphics.consumer_envs()
         envs.CODEX_SPARKLE_ENABLED = "false"
-        envs.GSETTINGS_SCHEMA_DIR = pkginfo.dep_install_dir("xim:gtk3") .. "/share/glib-2.0/schemas"
+        if userns_restricted() then
+            local profile = apparmor_profile(dir)
+            log.warn("ChatGPT: this host restricts unprivileged user namespaces, which "
+                .. "Chromium's sandbox needs. To allow them for this version, as root: "
+                .. "install -m 0644 %s /etc/apparmor.d/xlings-chatgpt-%s && "
+                .. "apparmor_parser -r /etc/apparmor.d/xlings-chatgpt-%s",
+                profile, pkginfo.version(), pkginfo.version())
+        end
     end
-    -- 更新开关只传给当前应用及其子进程
+    -- The updater switch reaches this app and its children only
     xvm.add("chatgpt", {
         bindir = bindir,
         alias = "ChatGPT",

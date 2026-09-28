@@ -1,9 +1,9 @@
 # ChatGPT 桌面版
 
 该包使用 OpenAI 官方固定版本资源，由 xlings 保存独立程序目录并切换启动入口。
-收录 Linux x86_64、ARM64 和 macOS ARM64 资源；不提供 Windows 或 macOS Intel 资源。
-Linux ARM64 的基础运行库仍不完整，当前不能承诺该平台可安装运行。
-包状态为 `dev`，平台声明表示有对应资源，不代表所有桌面环境已完成验收。
+提供 Linux x86_64 和 macOS ARM64；不提供 Windows、macOS Intel。
+官方也有 Linux ARM64 deb，但 `glibc`、`gcc-runtime` 等基础包还没有 ARM64 payload，
+所以配方暂不声明 Linux ARM64，等基础资源到位后再加。包状态为 `dev`。
 
 当前收录 `26.924.22138` 和 `26.917.71314`，`latest` 指向前者。
 
@@ -37,16 +37,38 @@ Alpine/musl 不在支持范围内。
 
 Linux 运行库需要通过包的 `deps` 声明，由 xlings 安装和提供。
 不提供要求用户自行补装发行版库的 `--check-deps` 命令。
-配方声明 glibc、GCC、GTK 3、NSS/NSPR、AT-SPI、CUPS、ALSA、X11、Mesa、Qt 5/6、USB 和 TPM 等独立依赖。
-新增库采用固定的 conda-forge 或 Debian 二进制资源及逐架构 SHA256，不调用系统包管理器。
+配方声明 glibc、GCC、GTK 3、NSS/NSPR、AT-SPI、CUPS、ALSA、X11、Mesa、Qt 5/6、USB、TPM，
+以及 Chromium 通过 dlopen 使用的 libsecret（系统密钥环存凭据，缺失时退化为明文存储）和 libnotify。
+新增的运行库 payload 由 `.agents/tools/repack/repack.py` 从 conda-forge / Debian（snapshot.debian.org）
+的固定构建重打包，发布到 xlings-res 的 GitHub 与 GitCode 两个镜像；安装期不解析 conda 或 deb 格式。
+需要跟随安装目录的构建前缀（gtk3 的模块目录）记录在 payload 的 `RELOCATE.json`，
+安装时由 `libs/relocate.lua` 改写；属于宿主的路径（CUPS 的 `/etc/cups` 和 socket、udev hwdb）
+在重打包时就映射到宿主路径。
 Qt 5 采用官方 Qt 5.15.2 qtbase 和配套 ICU 56，复用现有 qtsdk 下载与校验；不包含 Qt Quick 或 ODBC/PostgreSQL 驱动。
-原生模块使用的内置 libvips 仍来自 ChatGPT 自身资源，通过包内库目录参与解析。
-GTK schema 在包内编译，NSS 动态模块注册到 SubOS 库入口；Pango 补充 glibc 与运行库导出，并提高配方 revision。
+原生模块使用的内置 libvips 仍来自 ChatGPT 自身资源：它的目录写在 `exports.runtime.libdirs`，
+elfpatch 会把它放在包内每个 ELF 的 RUNPATH 最前面。
+gtk3 在安装时把 GSettings schema 编译进 payload，再声明到 `<subos>/share/glib-2.0/schemas`；
+`graphics.consumer_envs()` 给出的 `XDG_DATA_DIRS` 已包含 `<subos>/share`，因此不再设置 `GSETTINGS_SCHEMA_DIR`。
+Pango 补充 glibc 依赖以启用 elfpatch，并提高配方 revision。
 
-Linux ARM64 仍缺 glibc 加载器、GCC 及部分图形基础库资源，Qt 5 当前仅提供已验证的 x86_64 官方 SDK。
-新增的其他独立库已校验双架构归档，但这不代表整条 ARM64 依赖链可用。PR 保持 Draft/dev，等待社区补充基础资源与验收环境。
+新增运行库都同时发布了 x86_64 和 ARM64 payload；Linux ARM64 仍缺 glibc 加载器、GCC 及部分图形基础库，
+Qt 5 当前只有已验证的 x86_64 官方 SDK。
 不能把资源存在、安装成功或静态检查通过当作桌面运行验收。
 内核、显示服务、设备驱动和桌面会话仍属于宿主边界，不通过关闭 sandbox 绕过安全策略。
+
+## Chromium 沙箱与 AppArmor
+
+官方 deb 的 postinst 会安装 `/etc/apparmor.d/chatgpt`，允许 `/usr/lib/chatgpt/ChatGPT`
+创建用户命名空间，Chromium 沙箱需要这个权限。该 profile 按路径绑定，覆盖不到 xlings 的安装目录。
+在限制非特权用户命名空间的宿主上（Ubuntu 23.10 起默认
+`kernel.apparmor_restrict_unprivileged_userns=1`），安装时会为当前版本生成同样内容、
+路径指向本版本的 profile（`<版本目录>/share/apparmor/xlings-chatgpt`），`config()` 打印一行由用户以 root
+执行的加载命令。xlings 不执行任何 root 操作，也不使用 `--no-sandbox`。
+
+## 宿主边界
+
+打开链接用的 `xdg-open`（官方依赖 `xdg-utils`）、桌面会话的无障碍总线、密钥环守护进程、
+通知守护进程和 cupsd 都由宿主桌面提供；本包只提供它们的客户端库。
 
 ## 更新和版本数据
 

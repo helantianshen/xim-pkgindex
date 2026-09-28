@@ -36,6 +36,11 @@ package = {
             --     (no pango library links X at all); it is a pkg-config-time
             --     requirement of the .pc upstream shipped, so the closure
             --     check will report it as declared-but-unused, correctly.
+            --   * glibc -- what switches on elfpatch for this payload: the
+            --     auto-patch fires only when a runtime dep exports a loader.
+            --     Without it libpango kept its shipped RUNPATH, so its own deps
+            --     resolved only when the loading program's search path happened
+            --     to name them (gtk3 loaded alone did not find them).
             deps = {
                 "xim:glibc",
                 "xim:glib@>=2.80", "xim:harfbuzz@>=8.3", "xim:fribidi@>=1.0.13",
@@ -45,6 +50,8 @@ package = {
             exports = { runtime = { libdirs = {"lib"} } },
             ["latest"] = { ref = "1.52.1" },
             ["1.52.1"] = {
+                -- 1: same asset; the payload is now elfpatched (glibc dep
+                -- above), which rewrites its ELF files -- so it reinstalls.
                 revision = 1,
                 url = {
                     GLOBAL = "https://github.com/xlings-res/pango/releases/download/1.52.1/pango-1.52.1-linux-x86_64.tar.gz",

@@ -1,47 +1,81 @@
--- conda-forge 固定构建的独立运行库，资源 SHA256 与两架构 ELF 依赖均已核对
 package = {
     spec = "2",
+
+    homepage = "https://firefox-source-docs.mozilla.org/security/nss/",
     name = "nss",
-    description = "nss runtime libraries for desktop applications",
-    homepage = "https://anaconda.org/conda-forge/nss",
+    description = "Network Security Services (libnss3, libssl3, libsmime3, softoken and the built-in root CAs), with headers and pkg-config data",
+
     licenses = {"MPL-2.0"},
+    repo = "https://hg.mozilla.org/projects/nss",
+
     type = "package",
     archs = {"x86_64", "aarch64"},
     status = "dev",
-    categories = {"library", "desktop"},
+    categories = {"security", "lib"},
+    keywords = {"nss", "tls", "mozilla", "lib"},
+
     xvm_enable = true,
+
     xpm = {
         linux = {
-            deps = {"xim:7zip", "xim:glibc", "xim:nspr", "xim:sqlite"},
-            exports = { runtime = { libdirs = {"lib"} } },
+            -- DT_NEEDED outside the payload (readelf -d): libnspr4, libplc4, libplds4, libsqlite3.
+            deps = { "xim:glibc", "xim:nspr", "xim:sqlite" },
+            exports = {
+                runtime = { libdirs = { "lib" } },
+            },
             ["latest"] = { ref = "3.118" },
             ["3.118"] = {
                 x86_64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-64/nss-3.118-h445c969_0.conda",
-                    sha256 = "44dd98ffeac859d84a6dcba79a2096193a42fc10b29b28a5115687a680dd6aea",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/nss/releases/download/3.118/nss-3.118-linux-x86_64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/nss/releases/download/3.118/nss-3.118-linux-x86_64.tar.gz",
+                    },
+                    sha256 = "2c746858f7ba392fb26dc44e6e3998c70d8c1a2d6b36373eef53710f4fc13248",
                 },
                 aarch64 = {
-                    url = "https://conda.anaconda.org/conda-forge/linux-aarch64/nss-3.118-h544fa81_0.conda",
-                    sha256 = "48942696889367ffd448f8dccfc080fb7e130b9938a4a3b6b20ef8e6af856463",
+                    url = {
+                        GLOBAL = "https://github.com/xlings-res/nss/releases/download/3.118/nss-3.118-linux-aarch64.tar.gz",
+                        CN     = "https://gitcode.com/xlings-res/nss/releases/download/3.118/nss-3.118-linux-aarch64.tar.gz",
+                    },
+                    sha256 = "46c60b4c388641673d866dacfc99b1fe9090492710a15aa5530e30af92a805be",
                 },
             },
         },
     },
 }
 
-import("xim.libxpkg.xvm")
+-- Repacked from conda-forge by .agents/tools/repack/repack.py, x86_64 from
+--     nss-3.118-h445c969_0.conda
+-- and aarch64 from the same release's arm64 build. PROVENANCE.md inside the
+-- payload records every artefact, its sha256 and the exact command.
+--
+-- PLACEHOLDERS: only the .pc files carried one; rewritten to prefix=/usr.
+--
+-- NSS loads its PKCS#11 modules (libsoftokn3, libnssckbi, libfreebl) by name through
+-- NSPR; declare_libs puts them in the subos library view that the sealed RUNPATH
+-- ends with, which is where those lookups resolve.
+
 import("xim.libxpkg.pkginfo")
+import("xim.libxpkg.xvm")
 import("xim.pkgindex.sysroot")
-import("xim.pkgindex.runtime_archive")
+import("xim.pkgindex.selfcontain")
 
 function install()
-    return runtime_archive.install({"lib/libfreebl3.so", "lib/libfreeblpriv3.so", "lib/libnss3.so", "lib/libnssckbi.so", "lib/libnssdbm3.so", "lib/libnsssysinit.so", "lib/libnssutil3.so", "lib/libsmime3.so", "lib/libsoftokn3.so", "lib/libssl3.so"})
+    local dir = pkginfo.install_dir()
+    os.tryrm(dir)
+    os.mv(package.name .. "-" .. pkginfo.version(), dir)
+    selfcontain.seal(dir)
+    sysroot.relocate_pkgconfig(dir, "lib/pkgconfig")
+    return os.isfile(dir .. "/lib/libnss3.so")
 end
 
 function config()
+    local dir = pkginfo.install_dir()
+    local binding = package.name .. "@" .. pkginfo.version()
     xvm.add(package.name, { type = "group" })
-    -- NSPR 通过 SONAME 动态加载 NSS 模块，SubOS 库入口覆盖该加载路径
-    sysroot.declare_libs(pkginfo.install_dir(), "lib", package.name .. "@" .. pkginfo.version(), pkginfo.version())
+    sysroot.declare_libs(dir, "lib", binding, pkginfo.version())
+    sysroot.declare_headers_tree(dir, "include", "usr/include", binding)
+    sysroot.declare_pkgconfig(dir, "lib/pkgconfig", binding)
     return true
 end
 

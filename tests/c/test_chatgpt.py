@@ -44,8 +44,10 @@ for platform, entries in pairs(package.xpm) do
     assert(entries[entries.latest.ref])
     for version, resources in pairs(entries) do
         if version ~= "deps" and version ~= "latest" and version ~= "exports" then
-            assert(resources.aarch64)
+            -- Linux: x86_64 only until glibc/gcc-runtime ship arm64 payloads;
+            -- macOS: Apple silicon only
             assert((platform == "linux") == (resources.x86_64 ~= nil))
+            assert((platform == "macosx") == (resources.aarch64 ~= nil))
             for arch, asset in pairs(resources) do
                 assert(asset.url:match("^https://persistent%.oaistatic%.com/"))
                 assert(asset.url:find(version, 1, true))
@@ -139,6 +141,8 @@ assert(install())
         assert os.access(target / "app/ChatGPT", os.X_OK)
         assert (target / "app/resources/asar-link").is_symlink()
         assert (target / "app/resources/asar-link").read_bytes() == b"fixture"
+        profile = (target / "share/apparmor/xlings-chatgpt").read_text()
+        assert f'"{target}/app/ChatGPT" flags=(unconfined)' in profile and "userns," in profile
 
 
 @pytest.mark.static
@@ -155,13 +159,16 @@ def test_direct_xvm_registration(tmp_path, macos):
 import = function() end
 os.isfile = function(p) local f=io.open(p); if f then f:close(); return true end; return false end
 pkginfo = { install_dir = function() return arg[2] end,
-    dep_install_dir = function() return "/fixture/gtk3" end }
+    version = function() return "26.924.22138" end }
+log = { warn = function() end }
 graphics = { consumer_envs = function() return {} end }
 xvm = { add = function(name, node)
     assert(name == "chatgpt")
     assert(node.bindir == arg[3])
     assert(node.alias == "ChatGPT")
     assert(node.envs.CODEX_SPARKLE_ENABLED == "false")
+    -- schemas come through XDG_DATA_DIRS (<subos>/share), never a payload path
+    assert(node.envs.GSETTINGS_SCHEMA_DIR == nil)
 end }
 dofile(arg[1])
 assert(config())
