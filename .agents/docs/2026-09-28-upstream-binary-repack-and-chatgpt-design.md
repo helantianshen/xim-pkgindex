@@ -161,7 +161,7 @@ end
 4. **exports**：`app` + x64 的 sharp-libvips 目录（去掉用不到的 arm64 目录）。
 5. **envs**：去掉 `GSETTINGS_SCHEMA_DIR`；schema 通过 `XDG_DATA_DIRS=<subos>/share` 找到。
 6. **解包**：`7zz e -so -tAr … | 7zz x -si -txz -so | 7zz x -si -ttar …` 一条管道完成，1.5 GiB 的 `data.tar` 不再落盘。
-7. **AppArmor**：官方 postinst 装的 profile（已从 deb 中取出确认）是 `profile chatgpt "/usr/lib/chatgpt/ChatGPT" flags=(unconfined) { userns, }`，按路径绑定。`install()` 为当前版本生成同样内容、路径指向本版本的 `share/apparmor/xlings-chatgpt`；`config()` 在 `/proc/sys/kernel/apparmor_restrict_unprivileged_userns` 为 1 时，用 `log.warn` 给出一行以 root 执行的加载命令。xlings 自己不做 root 操作，也不用 `--no-sandbox`。
+7. **AppArmor**：官方 postinst 装的 profile（已从 deb 中取出确认）是 `profile chatgpt "/usr/lib/chatgpt/ChatGPT" flags=(unconfined) { userns, }`，按路径绑定。`install()` 为当前版本生成同样内容、路径指向本版本的 `share/apparmor/xlings-chatgpt`；加载它需要 root，由用户按 `.agents/docs/chatgpt.md` 的命令执行。xlings 不做 root 操作，也不用 `--no-sandbox`。原计划在 `config()` 里用 `log.warn` 提示，但实测发现 hook 成功时的输出会被 xlings 吞掉（`-v` 和 TTY 下都看不到），所以改成只写在文档里。xlings 目前没有“安装成功后提示用户”的渠道，记为 §10 的待决问题。
 8. **宿主边界**：`xdg-open`、a11y 总线、密钥环 / 通知守护进程、cupsd 由宿主桌面提供（写进 `.agents/docs/chatgpt.md`）。
 
 ---
@@ -188,7 +188,8 @@ end
 
 1. ChatGPT 这类专有许可的官方安装包，要不要像 claude 那样镜像到 xlings-res CN？（本 PR 未镜像）
 2. 同一个目录只能有一个 `gschemas.compiled`：以后出现第二个 GSettings schema 提供者时，需要在 subos 层统一编译。
-3. `graphics.consumer_envs()` 在用户没有设置 `XDG_DATA_DIRS` 时，只会给出 `<subos>/share`，不包含宿主的 `/usr/share`（图标、主题、mime）。这是先前就有的行为，对所有 graphics 消费方都一样，建议单独开 issue。
+3. xlings 没有安装成功后向用户提示的渠道（hook 在成功路径上的 stdout 会被丢弃），像 ChatGPT 的 AppArmor 前置条件这类宿主侧步骤，目前只能写进文档。
+4. `graphics.consumer_envs()` 在用户没有设置 `XDG_DATA_DIRS` 时，只会给出 `<subos>/share`，不包含宿主的 `/usr/share`（图标、主题、mime）。这是先前就有的行为，对所有 graphics 消费方都一样，建议单独开 issue。
 
 ---
 

@@ -160,7 +160,6 @@ import = function() end
 os.isfile = function(p) local f=io.open(p); if f then f:close(); return true end; return false end
 pkginfo = { install_dir = function() return arg[2] end,
     version = function() return "26.924.22138" end }
-log = { warn = function() end }
 graphics = { consumer_envs = function() return {} end }
 xvm = { add = function(name, node)
     assert(name == "chatgpt")

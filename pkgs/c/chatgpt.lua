@@ -79,7 +79,6 @@ import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.system")
 import("xim.libxpkg.xvm")
 import("xim.libxpkg.json")
-import("xim.libxpkg.log")
 import("xim.pkgindex.graphics")
 
 local function quote(s)
@@ -88,15 +87,6 @@ end
 
 local function apparmor_profile(dir)
     return dir .. "/share/apparmor/xlings-chatgpt"
-end
-
--- 1 when unprivileged user namespaces need an AppArmor grant on this host
-local function userns_restricted()
-    local f = io.open("/proc/sys/kernel/apparmor_restrict_unprivileged_userns")
-    if not f then return false end
-    local v = f:read("*l")
-    f:close()
-    return v == "1"
 end
 
 function install()
@@ -127,7 +117,8 @@ function install()
         -- The deb's postinst loads an AppArmor profile that grants user
         -- namespaces to /usr/lib/chatgpt/ChatGPT, which Chromium's sandbox
         -- needs on hosts that restrict them (Ubuntu 23.10+). The same profile
-        -- for this path, for the user to load; config() says how.
+        -- for this path; loading it needs root, so it is the user's step
+        -- (.agents/docs/chatgpt.md).
         os.mkdir(dir .. "/share/apparmor")
         local f = assert(io.open(apparmor_profile(dir), "w"))
         f:write("abi <abi/4.0>,\ninclude <tunables/global>\n\n",
@@ -159,14 +150,6 @@ function config()
         -- places its compiled GSettings schemas
         envs = graphics.consumer_envs()
         envs.CODEX_SPARKLE_ENABLED = "false"
-        if userns_restricted() then
-            local profile = apparmor_profile(dir)
-            log.warn("ChatGPT: this host restricts unprivileged user namespaces, which "
-                .. "Chromium's sandbox needs. To allow them for this version, as root: "
-                .. "install -m 0644 %s /etc/apparmor.d/xlings-chatgpt-%s && "
-                .. "apparmor_parser -r /etc/apparmor.d/xlings-chatgpt-%s",
-                profile, pkginfo.version(), pkginfo.version())
-        end
     end
     -- The updater switch reaches this app and its children only
     xvm.add("chatgpt", {

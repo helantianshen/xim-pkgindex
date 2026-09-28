@@ -60,10 +60,20 @@ Qt 5 当前只有已验证的 x86_64 官方 SDK。
 
 官方 deb 的 postinst 会安装 `/etc/apparmor.d/chatgpt`，允许 `/usr/lib/chatgpt/ChatGPT`
 创建用户命名空间，Chromium 沙箱需要这个权限。该 profile 按路径绑定，覆盖不到 xlings 的安装目录。
-在限制非特权用户命名空间的宿主上（Ubuntu 23.10 起默认
-`kernel.apparmor_restrict_unprivileged_userns=1`），安装时会为当前版本生成同样内容、
-路径指向本版本的 profile（`<版本目录>/share/apparmor/xlings-chatgpt`），`config()` 打印一行由用户以 root
-执行的加载命令。xlings 不执行任何 root 操作，也不使用 `--no-sandbox`。
+安装时会为当前版本生成同样内容、路径指向本版本的 profile：
+`<版本目录>/share/apparmor/xlings-chatgpt`。在限制非特权用户命名空间的宿主上
+（`cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns` 输出 1，Ubuntu 23.10 起默认如此），
+需要由用户以 root 加载一次：
+
+```sh
+# 以 root 执行；v 为已安装版本，路径按实际 XLINGS_HOME 调整
+v=26.924.22138
+install -m 0644 ~/.xlings/data/xpkgs/xim-x-chatgpt/$v/share/apparmor/xlings-chatgpt /etc/apparmor.d/xlings-chatgpt-$v
+apparmor_parser -r /etc/apparmor.d/xlings-chatgpt-$v
+```
+
+xlings 不执行任何 root 操作，也不使用 `--no-sandbox`。安装钩子的输出在成功时不会显示给用户，
+所以这一步只能写在文档里，不能靠安装时提示。
 
 ## 宿主边界
 

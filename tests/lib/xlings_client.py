@@ -33,5 +33,8 @@ class XlingsClient:
     def xim_add_xpkg(lua_path: str) -> tuple[bool, str]:
         # Index DB refresh latency can vary in CI, so keep a wider timeout budget.
         code, out = _run_xlings(f"xlings config --add-xpkg {lua_path}", timeout=45)
-        has_error = "error" in out.lower() and "please report" not in out.lower()
+        # The output echoes the recipe path, so a package named like
+        # `libgpg-error` must not read as a failure of its own registration.
+        scan = out.replace(os.path.basename(lua_path), "<recipe>").lower()
+        has_error = "error" in scan and "please report" not in scan
         return code == 0 and not has_error, out
