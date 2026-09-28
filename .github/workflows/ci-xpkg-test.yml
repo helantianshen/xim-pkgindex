@@ -35,6 +35,11 @@ jobs:
       - name: Install pytest
         run: pip install pytest
 
+      # The recipe and libs/ harnesses (tests/lua/, resource-table checks)
+      # evaluate Lua; without an interpreter they had nothing to run here.
+      - name: Install Lua
+        run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends lua5.4
+
       - name: L0 Static Analysis
         run: pytest tests/ -m static --tb=short -q
 

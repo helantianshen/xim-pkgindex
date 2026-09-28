@@ -153,7 +153,8 @@ jobs:
             fi
             output=$(xlings config --add-xpkg "$xpkg_file" 2>&1)
             echo "$output"
-            if echo "$output" | grep -i "error"; then
+            # the output echoes the recipe path; `libgpg-error.lua` is not an error
+            if echo "$output" | sed "s|$(basename "$file")|<recipe>|g" | grep -i "error"; then
               echo "❌ Error detected in $file"
               exit 1
             fi
