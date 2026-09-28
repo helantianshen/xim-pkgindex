@@ -56,7 +56,12 @@ package = {
         windows = {
             deps = { "xim:7zip" },
             ["latest"] = { ref = "6.11.1" },
-            ["6.11.1"] = {},
+            -- Revision 1: the payload no longer carries the MSVC C++ runtime
+            -- (docs/contributing.md §5.3). The program's build places the
+            -- toolset's, and the tools in bin/ start with the toolset's runtime
+            -- that mcpp puts first on every action's PATH; xlings replaces a
+            -- payload of revision 0 on its next use.
+            ["6.11.1"] = { revision = 1 },
         },
         linux = {
             deps = {
@@ -122,17 +127,6 @@ local BASE = {
           urls = { "https://github.com/xlings-res/qt-base/releases/download/6.11.1/qtqml-6.11.1-windows-x86_64.7z",
                    "https://gitcode.com/xlings-res/qt-base/releases/download/6.11.1/qtqml-6.11.1-windows-x86_64.7z" },
           sha256 = "705260431a127088f3e0acf2acf1f2e719d32248ac1b8c7ec0242cee4697541c" },
-        -- The VC++ runtime Qt's MSVC DLLs import (MSVCP140, VCRUNTIME140,
-        -- VCRUNTIME140_1, ...), taken from the redistributable Microsoft
-        -- publishes for app-local deployment and placed in bin/ beside Qt's
-        -- DLLs, so a program's runtime closure does not depend on the target
-        -- machine having the VC++ Redistributable installed. Same vsix and
-        -- pin as pkgs/m/msvc.lua's 14.44.35207 toolset.
-        { module = "vcruntime", name = "Microsoft.VC.14.44.17.14.CRT.Redist.X64.base.vsix",
-          urls = { "https://gitcode.com/xlings-res/msvc/releases/download/14.44.35207/Microsoft.VC.14.44.17.14.CRT.Redist.X64.base.vsix",
-                   "https://download.visualstudio.microsoft.com/download/pr/45d3b8dd-bced-4b37-9974-142f748d710c/4aaf54db0bfc9435f7c3660e1a00237a4b556042bfeea64bde44c2e0194e6ee5/Microsoft.VC.14.44.17.14.CRT.Redist.X64.base.vsix" },
-          pick = { from = "Contents/VC/Redist/MSVC/14.44.35112/x64/Microsoft.VC143.CRT", to = "bin" },
-          sha256 = "4aaf54db0bfc9435f7c3660e1a00237a4b556042bfeea64bde44c2e0194e6ee5" },
     },
     ["windows-aarch64"] = {
         { module = "qtbase", name = "qtbase-Windows-Windows_11_23H2-MSVC2022-Windows-Windows_11_23H2-AARCH64.7z",
@@ -271,7 +265,7 @@ function installed()
         if marker[e.module] ~= e.sha256 then return false end
     end
     -- A payload laid out before its runtime closure was declared (Linux: the
-    -- loader and RUNPATH; Windows: the VC++ runtime in bin/) is not this one.
+    -- loader and RUNPATH) is not this one.
     if not qtsdk.runtime_current(marker) then return false end
 
     local d = pkginfo.install_dir()
@@ -305,11 +299,6 @@ function installed()
     end
     if osname == "windows" then
         if not os.isfile(path.join(d, "lib", "Qt6Core.lib")) then return false end
-        -- the VC++ runtime placed beside Qt's DLLs (windows-x86_64)
-        if qtsdk.host_key() == "windows-x86_64"
-           and not os.isfile(path.join(d, "bin", "msvcp140.dll")) then
-            return false
-        end
     elseif osname == "linux" then
         if not os.isfile(path.join(d, "lib", "libQt6Core.so.6")) then return false end
         -- ICU, which libQt6Core.so.6 needs beside it (pkgs/q/qt.lua says why

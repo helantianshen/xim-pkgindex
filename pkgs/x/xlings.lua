@@ -38,7 +38,21 @@ package = {
             -- res_versioned: version-bump bot tracks openxlings/xlings releases and
             -- appends new ["x.y.z"] = "XLINGS_RES" entries (see version-check.py).
             res_versioned = true,
-            ["latest"] = { ref = "2026.9.27.1" },
+            ["latest"] = { ref = "2026.9.28.2" },
+            ["2026.9.28.2"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "e04dfeb6766c0662969c3dc95f5da3e4dca57e11f3126248436231d26464faf3",
+                    x86_64 = "672248ca8405b07e3767a4cfd785aba17eafd46f3f774561bf976b32bd61f159",
+                },
+            },
+            ["2026.9.28.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "2b413dc682a806e901eec648d7afdbd47b27b846a25ca236d9a081c4bfbab9f7",
+                    x86_64 = "7b847c03c20a6f05482102cefc3b36c831b2cacb71784b078b0443a55a72df21",
+                },
+            },
             ["2026.9.27.1"] = {
                 url = "XLINGS_RES",
                 sha256 = {
@@ -723,7 +737,19 @@ package = {
             -- res_versioned: version-bump bot tracks openxlings/xlings releases and
             -- appends new ["x.y.z"] = "XLINGS_RES" entries (see version-check.py).
             res_versioned = true,
-            ["latest"] = { ref = "2026.9.27.1" },
+            ["latest"] = { ref = "2026.9.28.2" },
+            ["2026.9.28.2"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "73d2f22cd2acb7856b7529e6f00457714a0810707cf21cff59b5f2a010430651",
+                },
+            },
+            ["2026.9.28.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "f837a82871dee331cc5569f4b7e458a457631b381fa2e9eba5c6337983177764",
+                },
+            },
             ["2026.9.27.1"] = {
                 url = "XLINGS_RES",
                 sha256 = {
@@ -1332,7 +1358,19 @@ package = {
             -- res_versioned: version-bump bot tracks openxlings/xlings releases and
             -- appends new ["x.y.z"] = "XLINGS_RES" entries (see version-check.py).
             res_versioned = true,
-            ["latest"] = { ref = "2026.9.27.1" },
+            ["latest"] = { ref = "2026.9.28.2" },
+            ["2026.9.28.2"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    x86_64 = "93d4dccda01c719ad6c1471648c29d26f157fe185e52624ddbbf678962488f0b",
+                },
+            },
+            ["2026.9.28.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    x86_64 = "5cc3adddaca6499ecafa2f6066cb63bb14b6ffb32f98128e475761192004ec27",
+                },
+            },
             ["2026.9.27.1"] = {
                 url = "XLINGS_RES",
                 sha256 = {

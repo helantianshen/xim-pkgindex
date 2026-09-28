@@ -17,7 +17,7 @@ PKG = "qt-base"
 PKG_FILE = "pkgs/q/qt-base.lua"
 
 EXPECTED_COUNT = {
-    "windows-x86_64": 7,   # qtbase qttools qttranslations d3dcompiler_47 opengl32sw qtqml vcruntime
+    "windows-x86_64": 6,   # qtbase qttools qttranslations d3dcompiler_47 opengl32sw qtqml
     "windows-aarch64": 4,  # qtbase qttools qttranslations qtqml
     "linux-x86_64": 5,     # qtbase qttools qttranslations icu qtqml
     "linux-aarch64": 5,
@@ -79,12 +79,16 @@ class TestStatic:
         assert "qtsdk.runtime_current(marker)" in meta.raw_content
 
     @pytest.mark.static
-    def test_windows_x64_carries_the_vc_runtime(self):
-        """Qt 的 MSVC DLL 依赖 VC++ 运行时; windows-x86_64 把可再分发的 DLL 放入 bin/。"""
-        rest = dict(_entries(_table(PKG_FILE), "windows-x86_64"))["vcruntime"]
-        assert 'from = "Contents/VC/Redist/MSVC/14.44.35112/x64/Microsoft.VC143.CRT"' in rest
-        assert 'to = "bin"' in rest
-        assert '"bin", "msvcp140.dll"' in open(os.path.join(project_root(), PKG_FILE), encoding="utf-8").read()
+    def test_windows_x64_carries_no_compiler_runtime(self, meta):
+        """库载荷不携带编译器的 C++ 运行时(docs/contributing.md §5.3)。
+
+        程序的构建放置工具集的运行时;bin/ 里的工具由 mcpp 放在每个 action PATH 最前面的
+        工具集运行时启动。revision 1 使已安装的 revision 0 载荷在下次使用时被替换。"""
+        src = open(os.path.join(project_root(), PKG_FILE), encoding="utf-8").read()
+        assert 'module = "vcruntime"' not in src
+        assert '"bin", "msvcp140.dll"' not in src
+        assert re.search(r'\["6\.11\.1"\]\s*=\s*\{\s*revision\s*=\s*1\s*\}', meta.raw_content), \
+            "windows 的 6.11.1 条目未声明 revision = 1"
 
     @pytest.mark.static
     def test_declares_7zip_dependency(self, meta):

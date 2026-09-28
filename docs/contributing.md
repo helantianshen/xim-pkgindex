@@ -162,6 +162,23 @@ file`）。所以：
 自建产物必须在 `.agents/tools/` 留一份**可复现**的构建脚本(固定 tar 的
 owner/mtime 与成员序,同输入同字节),并在配方里指向它。
 
+### 5.3 编译器的运行时不进库载荷
+
+**库包的载荷不携带编译器的 C++ 运行时。** Windows 上即 MSVC C++ 运行时集合:
+`vcruntime140*.dll`、`msvcp140*.dll`、`concrt140.dll`、`vccorlib140.dll`,以及它们所在的
+`Microsoft.VC*.CRT` redistributable 目录。唯一的例外是工具集包本身(`msvc`),它的
+redistributable 目录就是编译器的运行时。
+
+理由:程序的 C++ 运行时必须不旧于构建其任一映像的最新工具集。链接程序的那次构建知道这个
+工具集,库载荷不知道,它的副本是配方钉住的那个版本。`xim:qt-base` 6.11.1 曾在 `bin/` 中携带
+14.44 的副本,mcpp 把它放到用更新工具集构建的程序旁(2026-09-28 生态评审 §2.1)。mcpp
+2026.9.28.2 起放置工具集的集合,并把依赖包的副本作为打包缺陷说明一次;载荷自己的宿主工具
+(Qt 的 `moc.exe`)由引擎放在每个 action `PATH` 最前面的工具集运行时启动。
+
+`tests/test_no_compiler_runtime_in_payloads.py` 检查配方源码:注释以外的代码行不得出现上述
+名字或 redistributable 归档。去掉运行时副本的配方同时提高 `revision`,使已安装的旧载荷在下次
+使用时被替换;`installed()` 也不得再断言这些文件存在。
+
 ## 6. PR 清单
 
 PR 描述至少包含：

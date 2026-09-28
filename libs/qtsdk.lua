@@ -377,8 +377,10 @@ end
 --            each executable's interpreter and each ELF file's RUNPATH -- so
 --            the tools and the programs linked against Qt share one loader
 --            and libc (libxpkg elfpatch, the loader-provider predicate);
---   windows  the VC++ runtime, an archive entry with `pick` that places the
---            redistributable DLLs in bin/.
+--   windows  nothing: a library payload does not carry the compiler's C++
+--            runtime (docs/contributing.md §5.3). The program's build places
+--            the toolset's runtime, and mcpp puts it first on the PATH of the
+--            actions that run the tools in bin/.
 -- `mark_runtime` records `runtime <RUNTIME_REV>` in the marker once install()
 -- has laid the payload out, and `runtime_current` answers false for a payload
 -- without it. xlings consults installed() for a payload it is installing, not

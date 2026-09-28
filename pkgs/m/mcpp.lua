@@ -51,7 +51,28 @@ package = {
             -- res_versioned: version-bump bot tracks mcpp-community/mcpp releases
             -- and appends checked XLINGS_RES entries (see version-check.py).
             res_versioned = true,
-            ["latest"] = { ref = "2026.9.26.2" },
+            ["latest"] = { ref = "2026.9.28.2" },
+            ["2026.9.28.2"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "12551c17c50aabdf4181fc38110e703283a94f1ab538564f88fc9b3169ded555",
+                    x86_64 = "c3341c19d1b7dc15e36917f703160fb2a58f86e5e98e21363592359f94089bab",
+                },
+            },
+            ["2026.9.28.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "a1d9cad9d13ad9976c50eca22102e0e39c3d93ffab5c2d58af94f700d1463aaf",
+                    x86_64 = "b7ecb62d659bac9ed218fe046c0c87b745fda1ecaa3df9fec89352eedd1817bd",
+                },
+            },
+            ["2026.9.27.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "b76443839e28f6b18c07f394a9c441f1550bd5d7e6980bf811d7f4fa190faa6a",
+                    x86_64 = "8fc094e0342646936ab2d6b50344f183090a0a23d4d71a855bb738da50c7529f",
+                },
+            },
             ["2026.9.26.2"] = {
                 url = "XLINGS_RES",
                 sha256 = {
@@ -1161,7 +1182,25 @@ package = {
             -- res_versioned: version-bump bot tracks mcpp-community/mcpp releases
             -- and appends checked XLINGS_RES entries (see version-check.py).
             res_versioned = true,
-            ["latest"] = { ref = "2026.9.26.2" },
+            ["latest"] = { ref = "2026.9.28.2" },
+            ["2026.9.28.2"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "191445350169d09d0a7ffef3aa5025cf818f39294764fb1352e558190c8a4bea",
+                },
+            },
+            ["2026.9.28.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "f1125321afb062d8331bf0d1a21d03cb027df5db92b7d7cd1321815cd255ca89",
+                },
+            },
+            ["2026.9.27.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    aarch64 = "59dd8b828e746a19dd7da2cdd8dbf34a9a5c28e8ba45101d475b5b2f982f29c3",
+                },
+            },
             ["2026.9.26.2"] = {
                 url = "XLINGS_RES",
                 sha256 = {
@@ -2110,7 +2149,25 @@ package = {
             -- res_versioned: version-bump bot tracks mcpp-community/mcpp releases
             -- and appends checked XLINGS_RES entries (see version-check.py).
             res_versioned = true,
-            ["latest"] = { ref = "2026.9.26.2" },
+            ["latest"] = { ref = "2026.9.28.2" },
+            ["2026.9.28.2"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    x86_64 = "40fbf8f2661ce279aebb635ac4768ea907c959dc86f9f2a72edc93f6f1f299ff",
+                },
+            },
+            ["2026.9.28.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    x86_64 = "84c5dc1f1ce37aa49c9b45cd87e1b7a6400e65a102b9e5bc117219c7212af28d",
+                },
+            },
+            ["2026.9.27.1"] = {
+                url = "XLINGS_RES",
+                sha256 = {
+                    x86_64 = "c928bd5267e82d6e0d8e8831c5f05fbf29d75a055df5911144b5c0a79c9c57ee",
+                },
+            },
             ["2026.9.26.2"] = {
                 url = "XLINGS_RES",
                 sha256 = {
