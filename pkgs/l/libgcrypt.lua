@@ -30,14 +30,14 @@ package = {
                         GLOBAL = "https://github.com/xlings-res/libgcrypt/releases/download/1.12.2/libgcrypt-1.12.2-linux-x86_64.tar.gz",
                         CN     = "https://gitcode.com/xlings-res/libgcrypt/releases/download/1.12.2/libgcrypt-1.12.2-linux-x86_64.tar.gz",
                     },
-                    sha256 = "220b2692cc7edadcc732af6c963f384f47b386142eae42e3fec7c3c0ea3f814a",
+                    sha256 = "2d2f881dd0495e6447fa7b3b3d9f07af005d0767bfefc4170a03c40159744739",
                 },
                 aarch64 = {
                     url = {
                         GLOBAL = "https://github.com/xlings-res/libgcrypt/releases/download/1.12.2/libgcrypt-1.12.2-linux-aarch64.tar.gz",
                         CN     = "https://gitcode.com/xlings-res/libgcrypt/releases/download/1.12.2/libgcrypt-1.12.2-linux-aarch64.tar.gz",
                     },
-                    sha256 = "5ec1beaaf31747fdce89020d6a6606bfd12ec1b5cc526e5ffc8dfc338088bc7e",
+                    sha256 = "f58f47e3ea1d87e088c2930e133b367bdda1921a2d2aaddf79cbc107aa15172d",
                 },
             },
         },
@@ -51,7 +51,8 @@ package = {
 --
 -- PLACEHOLDERS: only the .pc files carried one; rewritten to prefix=/usr.
 --
--- Runtime library only: conda-forge's libgcrypt-lib split carries no headers.
+-- Runtime library only: conda-forge's libgcrypt-lib split carries no headers,
+-- so its libgcrypt.pc (which names them) is not shipped either (--drop).
 
 import("xim.libxpkg.pkginfo")
 import("xim.libxpkg.xvm")
