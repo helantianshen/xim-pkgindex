@@ -65,7 +65,10 @@ package = {
                 },
                 build = { "xim:7zip@26.02" },
             },
-            ["latest"] = { ref = "26.924.22138" },
+            ["latest"] = { ref = "26.928.20755" },
+            ["26.928.20755"] = {
+                x86_64 = deb("26.928.20755", "amd64", "4586dc1a6c8698982ca859f86aaa16835f33832a09e24042dfa75571aa60d8d1"),
+            },
             -- Revision 1: install() no longer keeps libqt5_shim.so and
             -- libqt6_shim.so (see there), and xim:qt5 / xim:qt-base left the
             -- deps. xlings replaces a payload of revision 0 on its next
@@ -80,7 +83,8 @@ package = {
             },
         },
         macosx = {
-            ["latest"] = { ref = "26.924.22138" },
+            ["latest"] = { ref = "26.928.20755" },
+            ["26.928.20755"] = mac("26.928.20755", "ac129ebf2e908696dce449e33592edc16b90b173f454227148dd10df9d8ec100"),
             ["26.924.22138"] = mac("26.924.22138", "7cf9569b116a32af61a6ab4e9979466774b6dc8e9dbcf70264596a1ae2dfd57d"),
             ["26.917.71314"] = mac("26.917.71314", "e3f436f729295bdb72b9acc9115bbf767a1fda7d081f2f83de84f70b93fdca9c"),
         },
